@@ -1,4 +1,5 @@
 // Copyright 2014-2014 the openage authors. See copying.md for legal info.
+//
 #ifndef OPENAGE_UTIL_BLOCK_ALLOCATOR_H_
 #define OPENAGE_UTIL_BLOCK_ALLOCATOR_H_
 #include <type_traits>
@@ -87,6 +88,7 @@ public:
      */
     T* get_ptr();
 
+    
     /**
      * Returns a pointer to an object of type T,
      * initialized with T(...vargs)
@@ -95,6 +97,9 @@ public:
      */
     template<class... Args>
     T* create(Args&&... vargs);
+
+    //!specialization of create for default constructors
+    T* create();
 
     /**
      * Releases the passed pointer, but does not call the destructor
@@ -150,9 +155,14 @@ T* block_allocator<T, index_type>::get_ptr(){
     return rpos;
 }
 
-template<class T, class index_type> template<class... Args>
+template<class T, class index_type>
+template<class... Args>
 T* block_allocator<T, index_type>::create(Args&&... vargs){
-    return new (this->get_ptr()) T(std::forward<Args...>(vargs...));
+    return new (this->get_ptr()) T(std::forward<Args>(vargs)...);
+}
+template<class T, class index_type>
+T* block_allocator<T, index_type>::create(){
+    return new (this->get_ptr()) T();
 }
 
  
@@ -205,7 +215,11 @@ public:
     //!Creates an object from the given arguments
     template<class... Args>
     T* create(Args&&... args){
-	return new (get_ptr()) T(std::forward<Args...>(args...));
+	return new T(std::forward<Args>(args)...);
+    }
+
+    T* create(){
+	return new T();
     }
     //!Releases the memory at the specified location w/o calling the destructor
     void release(T* data){
