@@ -95,7 +95,7 @@ public:
      */
     template<class... Args>
     T* create(Args&&... vargs);
-    
+
     /**
      * Releases the passed pointer, but does not call the destructor
      * of the object. Will invalidate the memory region, however
@@ -154,6 +154,7 @@ template<class T, class index_type> template<class... Args>
 T* block_allocator<T, index_type>::create(Args&&... vargs){
     return new (this->get_ptr()) T(std::forward<Args...>(vargs...));
 }
+
  
 template<class T, class index_type>
 void block_allocator<T, index_type>::release(T* to_release){

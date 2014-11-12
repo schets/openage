@@ -115,7 +115,7 @@ void doubly_linked_list() {
 
 out:
 	log::err("linked list test failed at stage %d", stage);
-	throw "linked list test failed";
+	throw "linked lisst test failed";
 }
 
 } // namespace tests
