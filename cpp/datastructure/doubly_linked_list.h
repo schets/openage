@@ -41,18 +41,18 @@ public:
  * can push/pop items to the front/back.
  */
 template <class T, class node_t=DoublyLinkedListNode<T>,
-	  class allocator = util::block_allocator<node_t>>
-    class DoublyLinkedList {
-    public:
-	DoublyLinkedList(size_t block_size=100)
-	    :
-	    first{nullptr},
-	    last{nullptr},
-	    node_count{0},
-	    alloc(block_size){
-	    }
+          class allocator = util::block_allocator<node_t>>
+class DoublyLinkedList {
+public:
+	DoublyLinkedList(size_t block_size = 200)
+		:
+		first{nullptr},
+		last{nullptr},
+		node_count{0},
+		alloc{block_size} {
+	}
 
-	    ~DoublyLinkedList() {
+	~DoublyLinkedList() {
 		this->clear();
 	    }
 
@@ -66,16 +66,16 @@ template <class T, class node_t=DoublyLinkedListNode<T>,
 		    "can't insert item as the first one "
 			"if there's already something in the list."
 			};
-	    } else {
-		node_t *new_node   = alloc.create(item);
-		new_node->next     = new_node;
-		new_node->previous = new_node;
+		} else {
+			node_t *new_node   = alloc.create(item);
+			new_node->next     = new_node;
+			new_node->previous = new_node;
 
-		this->first = new_node;
-		this->last  = new_node;
-		this->node_count += 1;
-		return new_node;
-	    }
+			this->first = new_node;
+			this->last  = new_node;
+			this->node_count += 1;
+			return new_node;
+		}
 	}
 
 	/**
@@ -83,14 +83,14 @@ template <class T, class node_t=DoublyLinkedListNode<T>,
 	 * O(1)
 	 */
 	node_t *insert_after(node_t *node, const T &item) {
-	    node_t *new_node   = alloc.create(item);
-	    new_node->next     = node->next;
-	    new_node->previous = node;
+		node_t *new_node   = alloc.create(item);
+		new_node->next     = node->next;
+		new_node->previous = node;
 
-	    node->next->previous = new_node;
-	    node->next           = new_node;
-	    this->node_count += 1;
-	    return new_node;
+		node->next->previous = new_node;
+		node->next           = new_node;
+		this->node_count += 1;
+		return new_node;
 	}
 
 	/**
@@ -98,14 +98,14 @@ template <class T, class node_t=DoublyLinkedListNode<T>,
 	 * O(1)
 	 */
 	node_t *insert_before(node_t *node, const T &item) {
-	    node_t *new_node   = alloc.create(item);
-	    new_node->next     = node;
-	    new_node->previous = node->previous;
+		node_t *new_node   = alloc.create(item);
+		new_node->next     = node;
+		new_node->previous = node->previous;
 
-	    node->previous->next = new_node;
-	    node->previous       = new_node;
-	    this->node_count += 1;
-	    return new_node;
+		node->previous->next = new_node;
+		node->previous       = new_node;
+		this->node_count += 1;
+		return new_node;
 	}
 
 	/**
@@ -259,9 +259,8 @@ template <class T, class node_t=DoublyLinkedListNode<T>,
 	node_t *last;      //!< The last node in the list
 
 	size_t node_count; //!< The number of nodes currently stored in the list.
-
-	allocator alloc;
-    };
+	allocator alloc;   //!< The allocator being used by the list
+};
 
 } // namespace datastructure
 } // namespace openage

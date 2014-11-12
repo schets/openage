@@ -17,9 +17,9 @@
  * Algorithmica 1, no. 1-4 (1986): 111-129.
  */
 
-#include <functional>
-#include <type_traits>
 #include <unordered_map>
+#include <type_traits>
+#include <functional>
 
 #include "../util/block_allocator.h"
 #include "../util/compiler.h"
@@ -147,21 +147,20 @@ template <class T, class compare=std::less<T>>
 
 
 template <class T, class compare=std::less<T>,
-	  class node_t=PairingHeapNode<T, compare>,
-	  class allocator = util::block_allocator<node_t>>
-    class PairingHeap {
-    public:
-	using this_type = PairingHeap<T, compare, node_t>;
+          class node_t=PairingHeapNode<T, compare>,
+          class allocator=util::block_allocator<node_t>>
+class PairingHeap {
+public:
+	using this_type = PairingHeap<T, compare, node_t, allocator>;
 
 	/**
-	 * create an empty head with specified allocator block size,
-	 * default 100
+	 * create a empty heap, with allocator block_size block_size
 	 */
-	PairingHeap(size_t block_size=100)
-	    :
-	    node_count(0),
-	    root_node(nullptr),
-	    alloc(block_size){
+	PairingHeap(size_t block_size = 200)
+		:
+		node_count(0),
+		root_node(nullptr),
+		alloc(block_size) {
 	}
 
 	~PairingHeap() {
@@ -188,8 +187,8 @@ template <class T, class compare=std::less<T>,
 	 * O(1)
 	 */
 	void push(const T &item) {
-	    node_t *new_node = alloc.create(item);
-	    this->push_node(*new_node);
+		node_t *new_node = alloc.create(item);
+		this->push_node(*new_node);
 	}
 
 	/**
@@ -266,14 +265,15 @@ template <class T, class compare=std::less<T>,
 	}
 
 	void delete_node(node_t *node) {
-	    auto nkeys = this->nodes.equal_range(node->data);
-	    for (auto it = nkeys.first; it != nkeys.second; ++it) {
-		if (it->second == node) {
-		    alloc.free(it->second);     // free the node
-		    this->nodes.erase(it); // remove entry n from hashmap
-		    this->node_count -= 1;
-		    return;
-		}
+
+		auto nkeys = this->nodes.equal_range(node->data);
+		for (auto it = nkeys.first; it != nkeys.second; ++it) {
+			if (it->second == node) {
+				alloc.free(it->second); // free the node
+				this->nodes.erase(it);  // remove entry n from hashmap
+				this->node_count -= 1;
+				return;
+			}
 	    }
 	    throw util::Error{"specified node not found for deletion!"};
 	}
@@ -371,7 +371,7 @@ template <class T, class compare=std::less<T>,
 
 	std::unordered_multimap<T, node_t *> nodes;
 	allocator alloc;
-    };
+};
 
 } // namespace datastructure
 } // namespace openage

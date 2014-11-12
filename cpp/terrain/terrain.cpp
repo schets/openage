@@ -32,12 +32,12 @@ Terrain::Terrain(AssetManager &assetmanager,
                  const std::vector<gamedata::blending_mode> &blending_meta,
                  bool is_infinite)
 	:
-        blending_enabled(true),
-        infinite(is_infinite),
-        terrain_id_count(terrain_meta.size()),
-        blendmode_count(blending_meta.size()),
-        textures(this->terrain_id_count),
-        blending_masks(this->blendmode_count),
+	blending_enabled(true),
+	infinite(is_infinite),
+	terrain_id_count(terrain_meta.size()),
+ 	blendmode_count(blending_meta.size()),
+	textures(this->terrain_id_count),
+	blending_masks(this->blendmode_count),
 	terrain_id_priority_map(terrain_id_count),
 	terrain_id_blendmode_map(terrain_id_count),
 	influences_buf(terrain_id_count){
