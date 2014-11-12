@@ -17,13 +17,14 @@
  * Algorithmica 1, no. 1-4 (1986): 111-129.
  */
 
-#include <functional>
-#include <type_traits>
 #include <unordered_map>
+#include <type_traits>
+#include <functional>
 
-#include "../log.h"
+#include "../util/block_allocator.h"
 #include "../util/compiler.h"
 #include "../util/error.h"
+#include "../log.h"
 
 namespace openage {
 namespace datastructure {
@@ -145,19 +146,22 @@ public:
 };
 
 
-template <class T, class compare=std::less<T>, class node_t=PairingHeapNode<T, compare>>
+template <class T, class compare=std::less<T>,
+          class node_t=PairingHeapNode<T, compare>,
+          class allocator=util::block_allocator<node_t>>
 class PairingHeap {
 public:
-	using this_type = PairingHeap<T, compare, node_t>;
+	using this_type = PairingHeap<T, compare, node_t, allocator>;
 
 
 	/**
-	 * create a empty heap.
+	 * create a empty heap, with allocator block_size block_size
 	 */
-	PairingHeap()
+	PairingHeap(size_t block_size = 0)
 		:
 		node_count(0),
-		root_node(nullptr) {
+		root_node(nullptr),
+		alloc(block_size) {
 	}
 
 	~PairingHeap() {
@@ -184,7 +188,7 @@ public:
 	 * O(1)
 	 */
 	void push(const T &item) {
-		node_t *new_node = new node_t{item};
+		node_t *new_node = alloc.create(item);
 		this->push_node(*new_node);
 	}
 
@@ -266,8 +270,8 @@ public:
 		auto nkeys = this->nodes.equal_range(node->data);
 		for (auto it = nkeys.first; it != nkeys.second; ++it) {
 			if (it->second == node) {
-				delete it->second;     // free the node
-				this->nodes.erase(it); // remove entry n from hashmap
+				alloc.free(it->second); // free the node
+				this->nodes.erase(it);  // remove entry n from hashmap
 				this->node_count -= 1;
 				return;
 			}
@@ -367,6 +371,7 @@ protected:
 	node_t *root_node;
 
 	std::unordered_multimap<T, node_t *> nodes;
+	allocator alloc;
 };
 
 } // namespace datastructure
