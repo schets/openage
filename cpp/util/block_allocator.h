@@ -36,7 +36,7 @@ protected:
     static_assert(std::is_unsigned<index_type>::value, "index type must be unsigned");
     //!Holds the union of data and next free node
     typedef union val_ptr {
-	struct{
+	alignas(T) struct{
 	    char values[sizeof(T)];//avoids any constructors being called
 	    index_type block_index;
 	} data;
@@ -205,7 +205,7 @@ public:
 template<class T>
 class standard_allocator{
     struct obj_size{
-	char data [sizeof(T)];
+	alignas(T) char data [sizeof(T)];
     };
 public:
     //!Allocates an object without initializing it
