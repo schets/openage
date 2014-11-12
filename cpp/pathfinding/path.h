@@ -3,7 +3,6 @@
 #ifndef OPENAGE_PATHFINDING_PATH_H_
 #define OPENAGE_PATHFINDING_PATH_H_
 
-#include <functional>
 #include <list>
 #include <vector>
 
@@ -142,15 +141,11 @@ namespace std {
 /**
  * Hash function for path nodes.
  * Just uses their position.
- * TODO: tile_t should provide its own hash function.
  */
 template <>
-struct hash<openage::path::Node &> {
+struct hash<openage::path::Node> {
 	size_t operator ()(const openage::path::Node &x) const {
-		openage::coord::tile node_pos = x.position;
-		size_t nehash = std::hash<openage::coord::tile_t>{}(node_pos.ne);
-		size_t sehash = std::hash<openage::coord::tile_t>{}(node_pos.se);
-		return openage::util::rol<size_t, 1>(nehash) ^ sehash;
+	    return hash<openage::coord::tile>{}(x.position);
 	}
 };
 

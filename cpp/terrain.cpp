@@ -4,6 +4,7 @@
 
 #include <unordered_map>
 #include <set>
+#include <cinttypes>
 
 #include "terrain_chunk.h"
 #include "engine.h"
@@ -32,28 +33,23 @@ Terrain::Terrain(AssetManager &assetmanager,
                  const std::vector<gamedata::blending_mode> &blending_meta,
                  bool is_infinite)
 	:
-	infinite{is_infinite} {
+	blending_enabled(true),
+	infinite(is_infinite),
+	terrain_id_count(terrain_meta.size()),
+	blendmode_count(blending_meta.size()),
+	textures(this->terrain_id_count),
+	blending_masks(this->blendmode_count),
+	terrain_id_priority_map(terrain_id_count),
+	terrain_id_blendmode_map(terrain_id_count),
+	influences_buf(terrain_id_count){
+
+	log::dbg("terrain prefs: %" PRIuPTR " tiletypes, %" PRIuPTR " blendmodes",
+	         static_cast<uintptr_t>(this->terrain_id_count),
+	         static_cast<uintptr_t>(this->blendmode_count));
 
 	// TODO:
 	//this->limit_positive =
 	//this->limit_negative =
-
-	// maps chunk position to chunks
-	this->chunks = std::unordered_map<coord::chunk, TerrainChunk *, coord_chunk_hash>{};
-
-	// activate blending
-	this->blending_enabled = true;
-
-	this->terrain_id_count         = terrain_meta.size();
-	this->blendmode_count          = blending_meta.size();
-	this->textures                 = new Texture*[this->terrain_id_count];
-	this->blending_masks           = new Texture*[this->blendmode_count];
-	this->terrain_id_priority_map  = new int[this->terrain_id_count];
-	this->terrain_id_blendmode_map = new int[this->terrain_id_count];
-	this->influences_buf           = new struct influence[this->terrain_id_count];
-
-
-	log::dbg("terrain prefs: %lu tiletypes, %lu blendmodes", this->terrain_id_count, this->blendmode_count);
 
 	// create tile textures (snow, ice, grass, whatever)
 	for (size_t i = 0; i < this->terrain_id_count; i++) {
@@ -95,12 +91,6 @@ Terrain::~Terrain() {
 			delete chunk.second;
 		}
 	}
-
-	delete[] this->blending_masks;
-	delete[] this->textures;
-	delete[] this->terrain_id_priority_map;
-	delete[] this->terrain_id_blendmode_map;
-	delete[] this->influences_buf;
 }
 
 
@@ -197,7 +187,7 @@ bool Terrain::validate_terrain(terrain_t terrain_id) {
 
 bool Terrain::validate_mask(ssize_t mask_id) {
 	if (mask_id >= (ssize_t)this->blendmode_count) {
-		throw util::Error("requested mask_id is out of range: %lu", mask_id);
+		throw util::Error("requested mask_id is out of range: %" PRIiPTR, static_cast<intptr_t>(mask_id));
 	}
 	else {
 		return true;
@@ -496,7 +486,7 @@ struct tile_draw_data Terrain::create_tile_advice(coord::tile position) {
 
 void Terrain::get_neighbors(coord::tile basepos,
                             struct neighbor_tile *neigh_data,
-                            struct influence *influences_by_terrain_id) {
+                            std::vector<influence>& influences_by_terrain_id) {
 	// walk over all given neighbor tiles and store them to the influence list,
 	// group them by terrain id.
 
@@ -528,7 +518,7 @@ void Terrain::get_neighbors(coord::tile basepos,
 
 struct influence_group Terrain::calculate_influences(struct tile_data *base_tile,
                                                      struct neighbor_tile *neigh_data,
-                                                     struct influence *influences_by_terrain_id) {
+                                                     std::vector<influence>& influences_by_terrain_id) {
 	// influences to actually draw (-> maximum 8)
 	struct influence_group influences;
 	influences.count = 0;
