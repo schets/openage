@@ -36,7 +36,7 @@ protected:
     static_assert(std::is_unsigned<index_type>::value, "index type must be unsigned");
     //!Holds the union of data and next free node
     typedef union val_ptr {
-	alignas(T) struct{
+	struct{
 	    T placeholder;
 	    index_type block_index;
 	} data;
@@ -115,16 +115,13 @@ public:
     template<class... Args>
     T* create(Args&&... vargs);
 
-    //!specialization of create for default constructors
-    T* create();
-
     /**
      * Releases the passed pointer, but does not call the destructor
      * of the object. Will invalidate the memory region, however
      * @param to_release The pointer whose memory is being released
      * TODO move nearly-empty blocks around as to minimize searching
      */
-    void release(T* to_release);
+    void release(T* to_release) noexcept;
 
     /**
      * Destroys the object and releases the memory, similar to delete
@@ -181,12 +178,7 @@ T* block_allocator<T, index_type>::create(Args&&... vargs){
 }
 
 template<class T, class index_type>
-T* block_allocator<T, index_type>::create(){
-    return new (this->get_ptr()) T();
-}
-
-template<class T, class index_type>
-void block_allocator<T, index_type>::release(T* to_release){
+void block_allocator<T, index_type>::release(T* to_release) noexcept{
     val_ptr* vptr = (val_ptr*)to_release;
     _block& block = this->blocks[vptr->data.block_index];
     vptr->next = block.first_open;
@@ -210,6 +202,45 @@ block_allocator<T, index_type>::_block::_block(allocator& _alloc, size_t data_le
     this->data[data_len-1].next=nullptr;
     this->first_open = &this->data[0];
 }
+
+//!allocator with same interface as block_allocator, but standard allocator
+template<class T>
+class standard_allocator{
+    std::allocator<T> alloc;
+    T* last_op;
+public:
+    //!Allocates an object without initializing it
+    T* get_ptr(){
+	T* rval = alloc.allocate(1, last_op);
+	last_op = rval;
+    }
+    //!Creates an object from the given arguments
+    template<class... Args>
+    T* create(Args&&... args){
+	T* ptr = get_ptr();
+	alloc.construct(ptr, std::forward<Args>(args)...);
+	return ptr;
+    }
+
+    //!Releases the memory at the specified location w/o calling the destructor
+    void release(T* data){
+	alloc.deallocate(data, 1);
+    }
+    //!Destroys the object and releases the memory
+    void free(T* data){
+	alloc.destroy(data);
+	release(data);
+    }
+    standard_allocator(size_t block_size, size_t block_limit=0, T* hint = 0)
+	:
+	last_op(hint){
+	//literally just to silence the unused parameter warning
+	//please save us optimizer
+	block_size=0;
+	block_limit=1;
+    }
+};
+
 
 } //util
 } //openage
