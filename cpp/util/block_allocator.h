@@ -42,7 +42,10 @@ protected:
 	} data;
 	val_ptr* next;
     } val_ptr;
+
     using allocator = std::allocator<val_ptr>;
+
+    //!deletion struct for unique_ptr
     struct deleter{
 	allocator& alloc;
 	size_t num;
@@ -55,6 +58,7 @@ protected:
 	    alloc.deallocate(del, num);
 	}
     };
+
     //!struct that contains the memory being allocated
     struct _block{
 	allocator& alloc;
