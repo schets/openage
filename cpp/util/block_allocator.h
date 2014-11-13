@@ -37,17 +37,30 @@ protected:
     //!Holds the union of data and next free node
     typedef union val_ptr {
 	alignas(T) struct{
-	    char values[sizeof(T)];//avoids any constructors being called
+	    T placeholder;
 	    index_type block_index;
 	} data;
 	val_ptr* next;
     } val_ptr;
-
+    using allocator = std::allocator<val_ptr>;
+    struct deleter{
+	allocator& alloc;
+	size_t num;
+	deleter(allocator& _alloc, size_t val)
+	    :
+	    alloc(_alloc),
+	    num(val){
+	}
+	void operator()(val_ptr* del) const{
+	    alloc.deallocate(del, num);
+	}
+    };
     //!struct that contains the memory being allocated
     struct _block{
-	std::unique_ptr<val_ptr[]> data;
+	allocator& alloc;
+	std::unique_ptr<val_ptr[], deleter> data;
 	val_ptr* first_open;
-	_block(size_t data_len);
+	_block(allocator& _alloc, size_t data_len, val_ptr* hint = (val_ptr*)0);
     };
     //!Attempts to retrieve a pointer, returns 0 otherwise.
     T* _get_ptr();
@@ -60,6 +73,10 @@ protected:
 
     //!limit on the amount of blocks
     index_type block_limit;
+
+    //!base allocator being used
+    allocator alloc;
+
 public:
     block_allocator(const block_allocator&) = delete;
     block_allocator operator=(const block_allocator&) = delete;
@@ -75,10 +92,11 @@ public:
      * @param _block_size The size of each contiguous chunk of memory
      * objects are taken from
      * @param _block_limit The limit on the number of blocks, zero
+     * @param a hint on where to begin allocating blocks
      * meaning unlimited.
      */
-    block_allocator(size_t _block_size, index_type _block_limit = 0);
-    
+    block_allocator(size_t _block_size, index_type _block_limit = 0, T* hint = 0);
+
     /**
      * Retrieves a pointer to an location in memory that holds 1 T,
      * except uninitialized. If allocations fails, return nullptr. If
@@ -88,7 +106,6 @@ public:
      */
     T* get_ptr();
 
-    
     /**
      * Returns a pointer to an object of type T,
      * initialized with T(...vargs)
@@ -118,12 +135,13 @@ public:
 
 template<class T, class index_type>
 block_allocator<T, index_type>::block_allocator(size_t _block_size,
-						index_type _block_limit)
+						index_type _block_limit,
+						T* hint)
 	:
 	block_size(_block_size),
 	block_limit(_block_limit){
-	this->blocks.emplace_back(this->block_size);
-    }
+    this->blocks.emplace_back(this->alloc, this->block_size, (val_ptr*)hint);
+}
 
 template<class T, class index_type>
 T* block_allocator<T, index_type>::_get_ptr(){
@@ -145,7 +163,8 @@ T* block_allocator<T, index_type>::get_ptr(){
     T* rpos = this->_get_ptr();
     if(unlikely(not rpos)){
 	if(block_limit == 0 || this->blocks.size() <= this->block_limit){
-	    this->blocks.emplace_back(this->block_size); 
+	    this->blocks.emplace_back(this->alloc, this->block_size,
+				      this->blocks.back().data.get()); 
 	    rpos = this->_get_ptr();
 	}
     }
@@ -160,12 +179,12 @@ template<class... Args>
 T* block_allocator<T, index_type>::create(Args&&... vargs){
     return new (this->get_ptr()) T(std::forward<Args>(vargs)...);
 }
+
 template<class T, class index_type>
 T* block_allocator<T, index_type>::create(){
     return new (this->get_ptr()) T();
 }
 
- 
 template<class T, class index_type>
 void block_allocator<T, index_type>::release(T* to_release){
     val_ptr* vptr = (val_ptr*)to_release;
@@ -181,62 +200,16 @@ void block_allocator<T, index_type>::free(T* free_val){
 }
 
 template<class T, class index_type>
-block_allocator<T, index_type>::_block::_block(size_t data_len)
+block_allocator<T, index_type>::_block::_block(allocator& _alloc, size_t data_len, val_ptr* hint)
     :
-    data(new val_ptr[data_len]){
+    alloc(_alloc),
+    data(alloc.allocate(data_len, hint), deleter(_alloc, data_len)){
     for(size_t i = 0; i < data_len-1; i++){
 	this->data[i].next = &this->data[i+1];
     }
     this->data[data_len-1].next=nullptr;
     this->first_open = &this->data[0];
 }
- 
-//!A block allocator which has a default size at compile time, \sa block_allocator
-template<class T, size_t default_size, class index_type = uint32_t>
-class block_allocator_static : public block_allocator<T, index_type>{
-public:
-    block_allocator_static(size_t block_size = default_size, index_type block_limit = 0)
-	:
-	block_allocator<T, index_type>(block_size, block_limit){
-    }
-};
-
-//!allocator with same interface as block_allocator, but calls new/delete
-template<class T>
-class standard_allocator{
-    struct obj_size{
-	alignas(T) char data [sizeof(T)];
-    };
-public:
-    //!Allocates an object without initializing it
-    T* get_ptr(){
-	return (T*)new obj_size;
-    }
-    //!Creates an object from the given arguments
-    template<class... Args>
-    T* create(Args&&... args){
-	return new T(std::forward<Args>(args)...);
-    }
-
-    T* create(){
-	return new T();
-    }
-    //!Releases the memory at the specified location w/o calling the destructor
-    void release(T* data){
-	delete (obj_size*)data;
-    }
-    //!Destroys the object and releases the memory
-    void free(T* data){
-	data->~T();
-	release(data);
-    }
-    standard_allocator(size_t block_size, size_t block_limit=0){
-	//literally just to silence the unused parameter warning
-	//please save us optimizer
-	block_size=0;
-	block_limit=1;
-    }
-};
 
 } //util
 } //openage
