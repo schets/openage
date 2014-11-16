@@ -79,10 +79,10 @@ constexpr coord::tile_delta const neigh_offsets[] = {
  */
 enum class tile_state {
 	missing,    //!< tile is not created yet
-		existing,   //!< tile is already existing
-		creatable,  //!< tile does not exist but can be created
-		invalid,    //!< tile does not exist and can not be created
-		};
+	existing,   //!< tile is already existing
+	creatable,  //!< tile does not exist but can be created
+	invalid,    //!< tile does not exist and can not be created
+};
 
 
 /**
