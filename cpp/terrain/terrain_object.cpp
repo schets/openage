@@ -2,30 +2,29 @@
 
 #include "terrain_object.h"
 
-#include "engine.h"
-#include "texture.h"
-#include "log.h"
 #include "terrain.h"
 #include "terrain_chunk.h"
-#include "util/error.h"
-#include "coord/tile.h"
-#include "coord/tile3.h"
-#include "coord/phys3.h"
-#include "coord/camgame.h"
+#include "../engine.h"
+#include "../log.h"
+#include "../texture.h"
+#include "../coord/tile.h"
+#include "../coord/tile3.h"
+#include "../coord/phys3.h"
+#include "../coord/camgame.h"
+#include "../util/error.h"
 
 namespace openage {
 
 TerrainObject::TerrainObject(Texture *tex,
                              coord::tile_delta foundation_size,
-                             unsigned player, int sound_id_destruction) {
-
-	this->placed                = false;
-	this->texture               = tex;
-	this->size                  = foundation_size;
-	this->player                = player;
-	this->sound_id_destruction  = sound_id_destruction;
-
-	this->occupied_chunk_count = 0;
+                             unsigned player, int sound_id_destruction)
+	:
+	sound_id_destruction{sound_id_destruction},
+	placed{false},
+	texture{tex},
+	player{player},
+	occupied_chunk_count{0} {
+	this->size = foundation_size;
 }
 
 
@@ -33,7 +32,7 @@ TerrainObject::~TerrainObject() {}
 
 
 void TerrainObject::remove() {
-	if (this->occupied_chunk_count == 0 || not this->placed) {
+	if (this->occupied_chunk_count == 0 or not this->placed) {
 		return;
 	}
 
@@ -77,8 +76,8 @@ bool TerrainObject::place(Terrain *terrain, coord::tile pos) {
 	bool chunk_known = false;
 
 
-	//set pointers to this object on each terrain tile
-	//where the building will stand and block the ground
+	// set pointers to this object on each terrain tile
+	// where the building will stand and block the ground
 
 	coord::tile temp_pos = this->start_pos;
 
@@ -163,16 +162,16 @@ bool TerrainObject::fits(Terrain *terrain, coord::tile pos) {
 			if (chunk == nullptr) {
 				return false;
 			} else {
-				//get tile data
+				// get tile data
 				auto tile = chunk->get_data(check_pos);
 
-				//is the terrain underground suitable?
-				//TODO: water needed? solid ground needed?
+				// is the terrain underground suitable?
+				// TODO: water needed? solid ground needed?
 				if (tile->terrain_id < 0) {
 					return false;
 				}
 
-				//is another object blocking that tile?
+				// is another object blocking that tile?
 				if (tile->obj != nullptr) {
 					return false;
 				}
@@ -188,27 +187,16 @@ bool TerrainObject::fits(Terrain *terrain, coord::tile pos) {
 
 void TerrainObject::set_position(coord::tile pos) {
 
-	// adjust the start position so that the mouse
-	// click happened more centered
-	this->start_pos     = pos;
-	//this->start_pos.ne -= (this->size.ne - 1) / 2;
-	//this->start_pos.se -= (this->size.se - 1) / 2;
+	this->start_pos = pos;
+	this->end_pos   = this->start_pos + this->size;
 
-	this->end_pos     = this->start_pos;
-	this->end_pos.ne += this->size.ne;
-	this->end_pos.se += this->size.se;
+	// TODO temporary hacky solution until openage::coord has been properly fixed.
+	coord::phys2 draw_pos = this->start_pos.to_phys2();
 
-	// the tile position where the graphic hotspot
-	// will be placed centered.
-	coord::tile drawpos_tile = this->start_pos;
-	coord::tile drawpos_mod2;
-	drawpos_mod2.ne = util::mod<coord::tile_t, 2>(drawpos_tile.ne);
-	drawpos_mod2.se = util::mod<coord::tile_t, 2>(drawpos_tile.se);
+	draw_pos.ne += ((this->size.ne - 1) * coord::settings::phys_per_tile) / 2;
+	draw_pos.se += ((this->size.se - 1) * coord::settings::phys_per_tile) / 2;
 
-	drawpos_tile.ne += ((this->size.ne - drawpos_mod2.ne) / 2);
-	drawpos_tile.se += ((this->size.se - drawpos_mod2.se) / 2);
-
-	this->draw_pos = drawpos_tile.to_phys2().to_phys3();
+	this->draw_pos  = draw_pos.to_phys3();
 }
 
 

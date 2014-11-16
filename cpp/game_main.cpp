@@ -19,7 +19,7 @@
 #include "gamedata/string_resource.gen.h"
 #include "gamedata/gamedata.gen.h"
 #include "log.h"
-#include "terrain.h"
+#include "terrain/terrain.h"
 #include "util/strings.h"
 #include "util/timer.h"
 
@@ -496,10 +496,20 @@ bool GameMain::on_input(SDL_Event *e) {
 
 	case SDL_KEYUP:
 		switch (((SDL_KeyboardEvent *) e)->keysym.sym) {
+
 		case SDLK_ESCAPE:
 			//stop the game
 			engine.stop();
 			break;
+
+		case SDLK_F1:
+			engine.drawing_huds = !engine.drawing_huds;
+			break;
+
+		case SDLK_F2:
+			engine.get_screenshot_manager().save_screenshot();
+			break;
+
 		case SDLK_F3:
 			engine.drawing_debug_overlay = !engine.drawing_debug_overlay;
 			break;
@@ -520,12 +530,6 @@ bool GameMain::on_input(SDL_Event *e) {
 		break;
 	case SDL_KEYDOWN:
 		switch (((SDL_KeyboardEvent *) e)->keysym.sym) {
-		case SDLK_SPACE:
-			this->terrain->blending_enabled = !terrain->blending_enabled;
-			break;
-		case SDLK_F2:
-			engine.get_screenshot_manager().save_screenshot();
-			break;
 		case SDLK_LCTRL:
 			this->ctrl_active = true;
 			break;
