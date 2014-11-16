@@ -106,6 +106,12 @@ public:
 	 * except uninitialized. If allocations fails, return nullptr. If
 	 * actual memory allocations fails, then std::bad_alloc may be thrown
 	 * @return A pointer pointing to an uninitialized T
+	 */
+	T* get_ptr_nothrow();
+
+	/**
+	 * The same as get_ptr_nothrow(), except throws std::bad_alloc
+	 * when a pointer cannot be retrieved
 	 * @raises std::bad_alloc upon failure
 	 */
 	T* get_ptr();
@@ -118,6 +124,15 @@ public:
 	 */
 	template<class... Args>
 	T* create(Args&&... vargs);
+
+	/**
+	 * Same as create(args...), except will return a null pointer
+	 * instead of throwing if the allocator cannot return another
+	 * pointer. However, if more blocks are needed and that allocator
+	 * fails, then std::bad_alloc will be thrown
+	 */
+	template<class... Args>
+	T* create_nothrow(Args&&... vargs);
 
 	/**
 	 * Releases the passed pointer, but does not call the destructor
@@ -159,19 +174,25 @@ T* block_allocator<T, index_type>::_get_ptr(){
 	}
 	return nullptr;
 }
-
+ 
 template<class T, class index_type>
 T* block_allocator<T, index_type>::get_ptr(){
+	T* rptr = this->get_ptr_nothrow();
+	if(unlikely(!rptr)){
+		throw std::bad_alloc();
+	}
+	return rptr;
+}
+
+template<class T, class index_type>
+T* block_allocator<T, index_type>::get_ptr_nothrow() {
 	T* rpos = this->_get_ptr();
 	if(unlikely(not rpos)){
 		if(block_limit == 0 || this->blocks.size() <= this->block_limit){
 			this->blocks.emplace_back(this->alloc, this->block_size,
-			                          this->blocks.back().data.get()); 
+			                          this->blocks.back().data.get()+this->block_size); 
 			rpos = this->_get_ptr();
 		}
-	}
-	if(not rpos){
-		throw std::bad_alloc();
 	}
 	return rpos;
 }
@@ -180,6 +201,16 @@ template<class T, class index_type>
 template<class... Args>
 T* block_allocator<T, index_type>::create(Args&&... vargs){
 	return new (this->get_ptr()) T(std::forward<Args>(vargs)...);
+}
+
+template<class T, class index_type>
+template<class... Args>
+T* block_allocator<T, index_type>::create_nothrow(Args&&... vargs){
+	T* space = this->get_ptr_nothrow();
+	if(likely(space)){
+		return new (space) T(std::forward<Args>(vargs)...);
+	}
+	return nullptr;
 }
 
 template<class T, class index_type>
@@ -218,6 +249,7 @@ public:
 	T* get_ptr(){
 		T* rval = alloc.allocate(1, last_op);
 		last_op = rval;
+		return rval;
 	}
 	//!Creates an object from the given arguments
 	template<class... Args>
@@ -247,5 +279,5 @@ public:
 };
 
 } //namespace util
-} //namespace openage
+}//namespace openage
 #endif
