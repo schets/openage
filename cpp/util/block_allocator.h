@@ -279,5 +279,5 @@ public:
 };
 
 } //namespace util
-}//namespace openage
+} //namespace openage
 #endif

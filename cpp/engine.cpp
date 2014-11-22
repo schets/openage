@@ -21,7 +21,6 @@
 #include "util/opengl.h"
 #include "util/strings.h"
 
-
 /**
  * stores all things that have to do with the game.
  *
@@ -35,7 +34,7 @@ namespace openage {
 Engine *Engine::instance = nullptr;
 
 void Engine::create(util::Dir *data_dir, const char *windowtitle) {
-	// only create the singleton instance if it was not created before..
+	// only create the singleton instance if it was not created
 	if (Engine::instance == nullptr) {
 		// reset the pointer to the new engine
 		Engine::instance = new Engine(data_dir, windowtitle);
