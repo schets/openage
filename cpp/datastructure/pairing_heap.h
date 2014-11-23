@@ -22,6 +22,7 @@
 #include <unordered_set>
 
 #include "../util/block_allocator.h"
+#include "../util/algorithm.h"
 #include "../util/compiler.h"
 #include "../util/error.h"
 #include "../log.h"
@@ -167,7 +168,6 @@ public:
 	 */
 	PairingHeap(size_t block_size = 100)
 		:
-		node_count(0),
 		root_node(nullptr),
 		alloc(block_size) {
 	}
@@ -319,25 +319,21 @@ public:
 	 * erase all elements on the heap.
 	 */
 	void clear() {
-		for (node_t* to_erase : nodes) {
-			alloc.free(to_erase);
-		}
-        this->nodes.clear();
-        this->node_count = 0;
+		util::for_each(this->nodes, [this](node_t* x){this->alloc.free(x);});
+		this->nodes.clear();
 	}
-
 	/**
 	 * @returns the number of nodes stored on the heap.
 	 */
 	size_t size() const {
-		return this->node_count;
+		return this->nodes.size();
 	}
 
 	/**
 	 * @returns whether there are no nodes stored on the heap.
 	 */
 	bool empty() const {
-		return (this->node_count == 0);
+		return !this->size();
 	}
 
 protected:
@@ -353,7 +349,6 @@ protected:
 		}
 
 		this->nodes.insert(node);
-		this->node_count += 1;
 	}
 
 	/**
@@ -364,7 +359,6 @@ protected:
 		if (likely(it != this->nodes.end())) {
 			this->nodes.erase(it);
 			alloc.free(node);
-			this->node_count -= 1;
 		} else {
 			throw util::Error{"specified node not found for deletion!"};
 		}
@@ -372,7 +366,6 @@ protected:
 
 
 protected:
-	size_t node_count;
 	compare cmp;
 	node_t *root_node;
 

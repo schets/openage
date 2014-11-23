@@ -32,17 +32,20 @@ Path to_point(coord::phys3 start,
 		coord::phys_t dy = point.se - end.se;
 		return std::hypot(dx, dy) < path_grid_size;
 	};
-	auto h = [&](const coord::phys3 &point) -> cost_t { return euclidean_cost(point, end); };
-	return a_star(start, valid_end, h, passable);
+
+	auto heuristic = [&](const coord::phys3 &point){
+		return euclidean_cost(point, end);
+	};
+	return a_star(start, valid_end, heuristic, passable);
 }
 
 Path to_object(openage::TerrainObject *to_move,
                openage::TerrainObject *end) {
 	coord::phys3 start = to_move->pos.draw;
-	auto valid_end = [&](const coord::phys3 &pos) -> bool {
+	auto valid_end = [&](const coord::phys3 &pos) {
 		return end->from_edge(pos) < (path_grid_size + to_move->min_axis() / 2);
 	};
-	auto heuristic = [&](const coord::phys3 &pos) -> cost_t {
+	auto heuristic = [&](const coord::phys3 &pos) {
 		return end->from_edge(pos) - to_move->min_axis() / 2;
 	};
 	return a_star(start, valid_end, heuristic, to_move->passable);
@@ -52,7 +55,7 @@ Path find_nearest(coord::phys3 start,
                   std::function<bool(const coord::phys3 &)> valid_end,
                   std::function<bool(const coord::phys3 &)> passable) {
 	// Use Dijkstra (hueristic = 0)
-	auto zero = [](const coord::phys3 &) -> cost_t { return .0f; };
+	auto zero = [](const coord::phys3 &) { return .0f; };
 	return a_star(start, valid_end, zero, passable);
 }
 
@@ -63,7 +66,7 @@ Path a_star(coord::phys3 start,
 
 	// improved allocator for nodes - similar performance
 	// to stack and takes care of deallocation
-	util::stack_allocator<Node> alloc(100);
+	util::stack_allocator<Node> alloc(1000);
 
 	//temporary storage for neighbors
 	node_pt neighbors[8];
@@ -95,7 +98,9 @@ Path a_star(coord::phys3 start,
 		if (valid_end(best_candidate->position)) {
 			log::dbg("path cost is %f", best_candidate->future_cost);
 			log::dbg("Total nodes created: %d", visited_tiles.size());
-			return best_candidate->generate_backtrace();
+			auto rval = closest_node->generate_backtrace();
+			log::dbg("Number of nodes in path: %d", rval.waypoints.size());
+			return std::move(rval);
 		}
 
 		// closest node for cases when target cannot be reached
@@ -144,7 +149,9 @@ Path a_star(coord::phys3 start,
 	log::dbg("incomplete path cost is %f", closest_node->future_cost);
 	log::dbg("Total nodes created: %d", visited_tiles.size());
 	
-	return closest_node->generate_backtrace();
+	auto rval = closest_node->generate_backtrace();
+	log::dbg("Number of nodes in path: %d", rval.waypoints.size());
+	return std::move(rval);
 }
 
 } // namespace path

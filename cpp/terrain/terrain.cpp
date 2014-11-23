@@ -46,10 +46,6 @@ Terrain::Terrain(AssetManager &assetmanager,
 	         static_cast<uintptr_t>(this->terrain_id_count),
 	         static_cast<uintptr_t>(this->blendmode_count));
 
-	// TODO:
-	//this->limit_positive =
-	//this->limit_negative =
-    
 	// create tile textures (snow, ice, grass, whatever)
 	for (size_t i = 0; i < this->terrain_id_count; i++) {
 		auto line = &terrain_meta[i];

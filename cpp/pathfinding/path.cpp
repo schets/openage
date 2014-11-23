@@ -1,7 +1,6 @@
 // Copyright 2014-2014 the openage authors. See copying.md for legal info.
 
 #include <cmath>
-#include <GL/glew.h>
 
 #include "path.h"
 #include "../terrain/terrain.h"
@@ -10,8 +9,7 @@ namespace openage {
 namespace path {
 
 bool compare_node_cost::operator ()(const node_pt lhs, const node_pt rhs) const {
-	// TODO: use node operator <
-	return lhs->future_cost < rhs->future_cost;
+	return *lhs < *rhs;
 }
 
 
@@ -85,8 +83,9 @@ void Node::get_neighbors(const nodemap_t &nodes,
 	for (int n = 0; n < 8; ++n) {
 		coord::phys3 n_pos = this->position + (neigh_phys[n] * scale);
 
-		if (nodes.count(n_pos) > 0) {
-			nodes_out[n] = nodes.at(n_pos);
+		auto iter = nodes.find(n_pos);
+		if (iter != nodes.end()) {
+			nodes_out[n] = iter->second;
 		}
 		else {
 			nodes_out[n] = alloc.create(n_pos, this);
