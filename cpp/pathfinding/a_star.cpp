@@ -57,13 +57,14 @@ Path a_star(coord::phys3 start,
 
 	// PairingHeap pop function currently crashes -- using priority queue for now
 	//datastructure::PairingHeap<Node *> node_candidates;
+    util::stack_allocator<Node> alloc(100);
 	std::priority_queue<node_pt, std::vector<node_pt>, compare_node_cost> node_candidates;
 
 	// list of known tiles and corresponding node.
 	nodemap_t visited_tiles;
 
 	// add starting node
-	node_pt startNode = std::make_shared<Node>(start, nullptr, .0f, heuristic(start));
+	node_pt startNode = alloc.create(start, nullptr, .0f, heuristic(start));
 	visited_tiles[startNode->position] = startNode;
 	node_candidates.push(startNode);
 
@@ -87,7 +88,7 @@ Path a_star(coord::phys3 start,
 			closest_node = best_candidate;
 		}
 
-		for (node_pt neighbor : best_candidate->get_neighbors(visited_tiles)) {
+		for (node_pt neighbor : best_candidate->get_neighbors(visited_tiles, alloc)) {
 			if (neighbor->was_best) {
 				continue;
 			}

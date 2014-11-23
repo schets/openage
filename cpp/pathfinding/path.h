@@ -12,6 +12,7 @@
 #include "../coord/phys3.h"
 #include "../coord/tile.h"
 #include "../util/misc.h"
+#include "../util/stack_allocator.h"
 
 
 namespace openage {
@@ -45,7 +46,7 @@ struct phys3_hash {
 };
 
 
-using node_pt = std::shared_ptr<Node>;
+using node_pt = Node*;
 
 /*
  * type for mapping tiles to nodes
@@ -72,7 +73,7 @@ bool passable_line(node_pt start, node_pt end, std::function<bool(const coord::p
 /**
  * One waypoint in a path.
  */
-class Node: public std::enable_shared_from_this<Node> {
+class Node {
 public:
 	Node(const coord::phys3 &pos, node_pt prev);
 	Node(const coord::phys3 &pos, node_pt prev, cost_t past, cost_t heuristic);
@@ -102,7 +103,9 @@ public:
 	/**
 	 * Get all neighbors of this graph node.
 	 */
-	std::vector<node_pt> get_neighbors(const nodemap_t &, float scale=1.0f);
+	std::vector<node_pt> get_neighbors(const nodemap_t &,
+                                       util::stack_allocator<Node>& alloc,
+                                       float scale=1.0f);
 
 	/**
 	 * The tile position this node is associated to.

@@ -61,7 +61,7 @@ cost_t Node::cost_to(const Node &other) const {
 Path Node::generate_backtrace() {
 	std::vector<Node> waypoints;
 
-	node_pt current = shared_from_this();
+	node_pt current = this;
 	do {
 		waypoints.push_back(*current);
 		current = current->path_predecessor;
@@ -71,7 +71,9 @@ Path Node::generate_backtrace() {
 	return {waypoints};
 }
 
-std::vector<node_pt> Node::get_neighbors(const nodemap_t &nodes, float scale) {
+std::vector<node_pt> Node::get_neighbors(const nodemap_t &nodes,
+                                         util::stack_allocator<Node>& alloc,
+                                         float scale) {
 	std::vector<node_pt> neighbors;
 	neighbors.reserve(8);
 	for (int n = 0; n < 8; ++n) {
@@ -81,7 +83,7 @@ std::vector<node_pt> Node::get_neighbors(const nodemap_t &nodes, float scale) {
 			neighbors.push_back( nodes.at(n_pos) );
 		}
 		else {
-			neighbors.push_back( std::make_shared<Node>(n_pos, shared_from_this()) );
+			neighbors.push_back(alloc.create(n_pos, this));
 		}
 	}
 	return neighbors;
