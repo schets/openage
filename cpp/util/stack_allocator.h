@@ -4,11 +4,11 @@
 #define OPENAGE_UTIL_STACK_ALLOCATOR_H_
 #include <memory>
 #include <vector>
-#include <iostream>
 
 #include "compiler.h"
 namespace openage{
 namespace util{
+
 /**
  * This class emulates a stack, except in dynamic memory.
  * It will grow to accomodate the amount of memory needed,
@@ -23,9 +23,9 @@ class stack_allocator{
 		allocator& alloc;
 		size_t num;
 		deleter(allocator& _alloc, size_t val)
-		:
-		alloc(_alloc),
-		num(val){
+			:
+			alloc(_alloc),
+			num(val){
 		}
 		void operator()(T* del) const{
 			alloc.deallocate(del, num);
@@ -39,7 +39,7 @@ class stack_allocator{
 	size_t stack_pos;
 	size_t stack_ind;
 	bool add_substack(T* hint = 0);
-    allocator alloc;
+	allocator alloc;
 
 	template<bool do_free> //compile time for effeciency
 	void _release();
@@ -98,7 +98,7 @@ public:
 	/**
 	 * Releases the pointer on the top of the stack,
 	 * but does not call the destructor of the object.
-	*/
+	 */
 	void release() noexcept;
 
 	/**
@@ -115,20 +115,20 @@ stack_allocator<T>::stack_allocator(size_t _stack_size, size_t _stack_limit, T* 
 	stack_limit(_stack_limit),
 	stack_size(_stack_size),
 	stack_pos(0){
-    this->add_substack(hint);
-    this->stack_ind=0;
+	this->add_substack(hint);
+	this->stack_ind=0;
 }
 
 template<class T>
 bool stack_allocator<T>::add_substack(T* hint){
     
 	if(unlikely(this->stack_limit && this->stack_ind == this->stack_limit)){
-        return false;
-    }
-    else{
-        if(!hint){
-            hint = this->ptrs.back().get() + this->stack_size;
-        }
+		return false;
+	}
+	else{
+		if(!hint){
+			hint = this->ptrs.back().get() + this->stack_size;
+		}
 		T* space = this->alloc.allocate(this->stack_size, hint);
 		this->ptrs.emplace_back(space, deleter(this->alloc, this->stack_size));
 		this->stack_ind++;
@@ -149,6 +149,7 @@ T* stack_allocator<T>::get_ptr_nothrow(){
 			this->stack_pos=0;
 		}
 	}
+	//TODO: explicitly track stack pointer? overoptimizing?
 	return &(this->ptrs[this->stack_ind][this->stack_pos++]);
 }
 
@@ -199,7 +200,7 @@ void stack_allocator<T>::free(){
 
 template<class T>
 void stack_allocator<T>::release() noexcept{
-	this->_release<false>();
+	this->_release<false>();    
 }
 
 } //namespace util

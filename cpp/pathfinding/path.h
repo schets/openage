@@ -3,14 +3,14 @@
 #ifndef OPENAGE_PATHFINDING_PATH_H_
 #define OPENAGE_PATHFINDING_PATH_H_
 
-#include <list>
-#include <memory>
-#include <queue>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
+#include "../coord/decl.h"
 #include "../coord/phys3.h"
 #include "../coord/tile.h"
+#include "../datastructure/pairing_heap.h"
 #include "../util/misc.h"
 #include "../util/stack_allocator.h"
 
@@ -22,56 +22,65 @@ class Node;
 class Path;
 
 /**
- * the data type for movement cost
+ * The data type for movement cost
  */
 using cost_t = float;
 
-/*
- * hash function for tiles
+/**
+ * Type for storing navigation nodes.
  */
-struct tile_hash {
-	size_t operator ()(const openage::coord::tile &tile) const {
-		size_t nehash = std::hash<openage::coord::tile_t> { }(tile.ne);
-		size_t sehash = std::hash<openage::coord::tile_t> { }(tile.se);
-		return openage::util::rol<size_t, 1>(nehash) ^ sehash;
-	}
-};
-
-struct phys3_hash {
-	size_t operator ()(const openage::coord::phys3 &pos) const {
-		size_t nehash = std::hash<openage::coord::phys_t> { }(pos.ne);
-		size_t sehash = std::hash<openage::coord::phys_t> { }(pos.se);
-		return openage::util::rol<size_t, 1>(nehash) ^ sehash;
-	}
-};
-
-
 using node_pt = Node*;
 
-/*
- * type for mapping tiles to nodes
+/**
+ * Type for mapping tiles to nodes.
  */
-using nodemap_t = std::unordered_map<coord::phys3, node_pt, phys3_hash>;
+using nodemap_t = std::unordered_map<coord::phys3, node_pt>;
 
-constexpr unsigned int neigh_shift = 13;
+
+/**
+ * Cost comparison for node_pt.
+ * Extracts the ptr from the shared_ptr.
+ * Calls operator < on Node.
+ */
+struct compare_node_cost {
+	bool operator ()(const node_pt lhs, const node_pt rhs) const;
+};
+
+/**
+ * Priority queue node item type.
+ */
+using heap_t = datastructure::PairingHeap<node_pt, compare_node_cost>;
+
+/**
+ * Size of phys-coord grid for path nodes.
+ *
+ * This equals a node grid size of (phys/tile) / 8.
+ */
+constexpr int path_grid_size = coord::settings::phys_per_tile >> 3;
+
+/**
+ * Phys3 delta coordinates to select for path neighbors.
+ */
 constexpr coord::phys3_delta const neigh_phys[] = {
-	{ 1 * (1 << neigh_shift), -1 * (1 << neigh_shift), 0},
-	{ 1 * (1 << neigh_shift),  0 * (1 << neigh_shift), 0},
-	{ 1 * (1 << neigh_shift),  1 * (1 << neigh_shift), 0},
-	{ 0 * (1 << neigh_shift),  1 * (1 << neigh_shift), 0},
-	{-1 * (1 << neigh_shift),  1 * (1 << neigh_shift), 0},
-	{-1 * (1 << neigh_shift),  0 * (1 << neigh_shift), 0},
-	{-1 * (1 << neigh_shift), -1 * (1 << neigh_shift), 0},
-	{ 0 * (1 << neigh_shift), -1 * (1 << neigh_shift), 0}
+	{ 1 * path_grid_size, -1 * path_grid_size, 0},
+	{ 1 * path_grid_size,  0 * path_grid_size, 0},
+	{ 1 * path_grid_size,  1 * path_grid_size, 0},
+	{ 0 * path_grid_size,  1 * path_grid_size, 0},
+	{-1 * path_grid_size,  1 * path_grid_size, 0},
+	{-1 * path_grid_size,  0 * path_grid_size, 0},
+	{-1 * path_grid_size, -1 * path_grid_size, 0},
+	{ 0 * path_grid_size, -1 * path_grid_size, 0}
 };
 
 /**
  *
  */
-bool passable_line(node_pt start, node_pt end, std::function<bool(const coord::phys3 &)>passable, float samples=5.0f);
+bool passable_line(node_pt start, node_pt end,
+                   std::function<bool(const coord::phys3 &)>passable,
+                   float samples=5.0f);
 
 /**
- * One waypoint in a path.
+ * One navigation waypoint in a path.
  */
 class Node {
 public:
@@ -103,9 +112,10 @@ public:
 	/**
 	 * Get all neighbors of this graph node.
 	 */
-	std::vector<node_pt> get_neighbors(const nodemap_t &,
-                                       util::stack_allocator<Node>& alloc,
-                                       float scale=1.0f);
+	void get_neighbors(const nodemap_t &,
+	                   node_pt out_nodes[8],
+	                   util::stack_allocator<Node>& alloc,
+	                   float scale=1.0f);
 
 	/**
 	 * The tile position this node is associated to.
@@ -160,6 +170,11 @@ public:
 	 * Node where this one was reached by least cost.
 	 */
 	node_pt path_predecessor;
+
+	/**
+	 * Priority queue node that contains this path node.
+	 */
+	heap_t::node_t* heap_node;
 };
 
 
@@ -172,6 +187,8 @@ public:
 	Path();
 	Path(const std::vector<Node> &nodes);
 	~Path();
+
+	void draw_path();
 
 	/**
 	 * These are the waypoints to navigate in order.
@@ -196,6 +213,20 @@ struct hash<openage::path::Node &> {
 		openage::coord::phys3 node_pos = x.position;
 		size_t nehash = std::hash<openage::coord::phys_t>{}(node_pos.ne);
 		size_t sehash = std::hash<openage::coord::phys_t>{}(node_pos.se);
+		return openage::util::rol<size_t, 1>(nehash) ^ sehash;
+	}
+};
+
+/**
+ * Hash function for phys3 coordinates.
+ *
+ * TODO: relocate to coord/
+ */
+template <>
+struct hash<openage::coord::phys3> {
+	size_t operator ()(const openage::coord::phys3 &pos) const {
+		size_t nehash = std::hash<openage::coord::phys_t> {}(pos.ne);
+		size_t sehash = std::hash<openage::coord::phys_t> {}(pos.se);
 		return openage::util::rol<size_t, 1>(nehash) ^ sehash;
 	}
 };
