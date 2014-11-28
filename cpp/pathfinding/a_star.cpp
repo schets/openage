@@ -100,7 +100,7 @@ Path a_star(coord::phys3 start,
 			log::dbg("Total nodes created: %d", visited_tiles.size());
 			auto rval = closest_node->generate_backtrace();
 			log::dbg("Number of nodes in path: %d", rval.waypoints.size());
-			return std::move(rval);
+			return rval;
 		}
 
 		// closest node for cases when target cannot be reached
@@ -119,7 +119,7 @@ Path a_star(coord::phys3 start,
 			}
 
 			bool not_visited = (visited_tiles.count(neighbor->position) == 0);
-			cost_t new_past_cost = best_candidate->past_cost + best_candidate->cost_to(*neighbor);
+			cost_t new_past_cost = best_candidate->past_cost +best_candidate->cost_to(*neighbor);
 
 			// if new cost is better than the previous path
 			if (not_visited or new_past_cost < neighbor->past_cost) {
@@ -151,7 +151,7 @@ Path a_star(coord::phys3 start,
 	
 	auto rval = closest_node->generate_backtrace();
 	log::dbg("Number of nodes in path: %d", rval.waypoints.size());
-	return std::move(rval);
+	return rval;
 }
 
 } // namespace path

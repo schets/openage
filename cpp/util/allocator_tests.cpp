@@ -16,6 +16,16 @@ union val_ptr {
 	val_ptr* next;
 };
 
+struct test_deleter{
+	int* val;
+	test_deleter(int* v)
+		:
+		val(v){}
+	~test_deleter(){
+		*val = 0;
+	}
+};
+
 template<class T>
 int block_allocator_size(){
 	block_allocator<T> alloc(10);
@@ -57,6 +67,21 @@ int block_allocator_block_test(){
 	return -1;
 }
 
+int block_allocator_test_deleter(){
+	int v1=1;
+	block_allocator<test_deleter> alloc(10);	
+	test_deleter* td1 = alloc.create(&v1);
+	if(v1 != 1){return 0;}
+	alloc.release(td1);
+	if(v1 != 1){return 1;}
+
+	td1 = alloc.create(&v1);
+	alloc.free(td1);
+	if(v1 != 0){return 2;}
+
+	return -1;
+}
+
 void block_allocator(){
 	int ret;
 	const char* testname;
@@ -68,6 +93,9 @@ void block_allocator(){
 	}
 	else if((ret = block_allocator_free_test()) != -1){
 		testname = "allocation freeing algorithm failed";
+	}
+	else if((ret = block_allocator_test_deleter()) != -1){
+		testname = "allocation deletion algorithm failed";
 	}
 	else{
 		return;
@@ -124,8 +152,6 @@ void stack_allocator(){
 
 }
 
-;
-;
 template<class T>
 int fixed_block_allocator_size(){
 	fixed_block_allocator<T> alloc(10);
@@ -153,15 +179,30 @@ int fixed_block_allocator_fixed_test(){
 	for(size_t i = 0; i < 9; i++){
 		alloc.get_ptr();
 	}
-	if(!alloc.get_ptr_nothrow()){return 0;}
-	if(alloc.get_ptr_nothrow()){return 1;}
+	if(!alloc.get_ptr()){return 0;}
+	if(alloc.get_ptr()){return 1;}
 	try{
-		alloc.get_ptr();
+		alloc.get_ptr_throw();
 	}
 	catch(std::bad_alloc e){
 		return -1;
 	}
 	return 2;
+}
+
+int fixed_block_allocator_test_deleter(){
+	int v1=1;
+	fixed_block_allocator<test_deleter> alloc(10);	
+	test_deleter* td1 = alloc.create(&v1);
+	if(v1 != 1){return 0;}
+	alloc.release(td1);
+	if(v1 != 1){return 1;}
+
+	td1 = alloc.create(&v1);
+	alloc.free(td1);
+	if(v1 != 0){return 2;}
+
+	return -1;
 }
 
 void fixed_block_allocator(){
@@ -179,11 +220,14 @@ void fixed_block_allocator(){
 	else if((ret = fixed_block_allocator_fixed_test()) != -1){
 		testname = "fixed_block_allocator is not fixed";
 	}
+	else if((ret = fixed_block_allocator_test_deleter()) != -1){
+		testname = "allocation deletion algorithm failed";
+	}
 	else{
 		return;
 	}
 	log::err("%s failed at stage %d", testname, ret);
-	throw "failedfixed_block_allocator test";
+	throw "failed fixed_block_allocator test";
 
 }
 
@@ -207,10 +251,10 @@ int fixed_stack_allocator_fixed_test(){
 	for(size_t i = 0; i < 9; i++){
 		alloc.get_ptr();
 	}
-	if(!alloc.get_ptr_nothrow()){return 0;}
-	if(alloc.get_ptr_nothrow()){return 1;}
+	if(!alloc.get_ptr()){return 0;}
+	if(alloc.get_ptr()){return 1;}
 	try{
-		alloc.get_ptr();
+		alloc.get_ptr_throw();
 	}
 	catch(std::bad_alloc e){
 		return -1;

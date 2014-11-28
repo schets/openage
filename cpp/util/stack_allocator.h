@@ -3,49 +3,119 @@
 #ifndef OPENAGE_UTIL_STACK_ALLOCATOR_H_
 #define OPENAGE_UTIL_STACK_ALLOCATOR_H_
 #include <memory>
+#include <cstdlib>
 #include <vector>
+#include <utility>
+#include <new>
 
 #include "compiler.h"
 namespace openage{
 namespace util{
-    
-//TODO: Documentation
 
+namespace alloc{
 /**
- * This class emulates a stack, except in dynamic memory.
- * It will grow to accomodate the amount of memory needed,
- * and provides almost free allocations/deallocations.
- * However, memory can only be acquired/released from the top
- * of the stack
+ * Class for common stack allocator functionality
+ * Base implementation must provide get_ptr() ,
+ * and template<bool> releaser(), which releases and frees
+ * if the template parameter is true. The size of each allcoation
+ * should be sizeof(T)
+ *
+ * Unique and shared manipulation are not provided
+ * since memory cannot be deallocated in arbitrary order
  */
+template<class T, template<class> class core_alloc>
+class stack_allocator_common : public core_alloc<T>{
+
+public:
+	~stack_allocator_common() = default;
+	//base classes have whatever damn constructor they want
+	template<class... Args>
+	stack_allocator_common(Args&&... vargs)
+		:
+		core_alloc<T>(std::forward<Args>(vargs)...){
+	}
+
+	/**
+	 * The same as get_ptr_nothrow(), except throws std::bad_alloc
+	 * when a pointer cannot be retrieved
+	 * @raises std::bad_alloc upon failure
+	 */
+	inline T* get_ptr_throw(){
+		T* space = this->get_ptr();
+		if(unlikely(!space)){
+			throw std::bad_alloc();
+		}
+		return space;
+	}
+
+	/**
+	 * Returns a pointer to an object of type T,
+	 * initialized with T(...vargs)
+	 * @param vargs The arguments passed to the constructor
+	 * @return A pointer to a newly constructed T(...vargs)
+	 */
+	template<class... Args>
+	inline T* create(Args&&... vargs){
+		return new(this->get_ptr()) T(std::forward<Args>(vargs)...);
+	}
+
+	/**
+	 * Same as create(args...), except will throw std::bad_alloc
+	 * instead of returning nullptr if the allocator cannot return another
+	 * pointer.
+	 */
+	template<class... Args>
+	inline T* create_throw(Args&&... vargs){
+		return new(this->get_ptr_throw()) T(std::forward<Args>(vargs)...);
+	}
+		
+	/**
+	 * Releases the passed pointer, but does not call the destructor
+	 * @param to_release The pointer whose memory is being released
+	 */
+	inline void release(){
+		this->template releaser<false>();
+	}
+
+	/**
+	 * Releases the passed pointer, and calls the destructor
+	 * @param to_release The pointer whose memory is being released
+	 */
+	inline void free(){
+		this->template releaser<true>();
+	}
+
+	inline size_t alloc_size() const {return sizeof(T);}
+};
+
+
+
+//!implementation of stack allocator
 template<class T>
 class stack_allocator{
-	using allocator = std::allocator<T>;
+protected:
 	struct deleter{
-		allocator& alloc;
-		size_t num;
-		deleter(allocator& _alloc, size_t val)
-			:
-			alloc(_alloc),
-			num(val){
-		}
 		void operator()(T* del) const{
-			alloc.deallocate(del, num);
+			::free(del);
 		}
 	};
 
-	template<bool do_release>
+	template<bool do_free>
 	void releaser();
+
+	template<bool do_free>
+	void fancy_release();
 
 	using ptr_type = std::unique_ptr<T[], deleter>;
 	std::vector<ptr_type> ptrs;
-	size_t stack_limit;
 	size_t stack_size;
 	T* cur_ptr;
 	T* cur_stackend;
 	typename std::vector<ptr_type>::iterator cur_substack;
-	bool add_substack(T* hint = 0);
-	allocator alloc;
+	
+	bool add_substack();
+
+	T* update_cur_stack();
 
 public:
 	stack_allocator(const stack_allocator&) = delete;
@@ -62,171 +132,95 @@ public:
 	 * or unlimited if stack_limit==0
 	 * @param stack_size The size of each sub-stack used in allocating
 	 * @param stack_limit The limit n the number of sub stacks
-	 * @param hint A hint for where to do the next allocation
 	 */
-	stack_allocator(size_t stack_size, size_t stack_limit=0, T* hint=0);
+	stack_allocator(size_t stack_size);
 
 	/**
 	 * Retrieves a pointer to an location in memory that holds 1 T,
-	 * except uninitialized. If allocations fails, return nullptr. If
-	 * actual memory allocations fails, then std::bad_alloc may be thrown
+	 * except uninitialized. If allocations fails, return nullptr.
 	 * @return A pointer pointing to an uninitialized T
 	 */
-	T* get_ptr_nothrow();
-
-	/**
-	 * The same as get_ptr_nothrow(), except throws std::bad_alloc
-	 * when a pointer cannot be retrieved
-	 * @raises std::bad_alloc upon failure
-	 */
-	T* get_ptr();
-
-	/**
-	 * Returns a pointer to an object of type T,
-	 * initialized with T(...vargs)
-	 * @param vargs The arguments passed to the constructor
-	 * @return A pointer to a newly constructed T(...vargs)
-	 */
-	template<class... Args>
-	T* create(Args&&... vargs);
-
-	/**
-	 * Same as create(args...), except will return a null pointer
-	 * instead of throwing if the allocator cannot return another
-	 * pointer. However, if more blocks are needed and that allocator
-	 * fails, then std::bad_alloc will be thrown
-	 */
-	template<class... Args>
-	T* create_nothrow(Args&&... vargs);
-
-	/**
-	 * Releases the pointer on the top of the stack,
-	 * but does not call the destructor of the object.
-	 */
-	void release() noexcept;
-
-	/**
-	 * Destroys the object on the top of the stack and releases the
-	 * memory, similar to delete
-	 */
-	void free();
-
+	T* get_ptr() ;
 };
 
 template<class T>
-stack_allocator<T>::stack_allocator(size_t _stack_size, size_t _stack_limit, T* hint)
+stack_allocator<T>::stack_allocator(size_t _stack_size)
 	:
-	stack_limit(_stack_limit),
 	stack_size(_stack_size){
-	this->add_substack(hint);
+	this->add_substack();
 }
 
 template<class T>
-bool stack_allocator<T>::add_substack(T* hint){
-	if(unlikely(this->stack_limit && this->ptrs.size() == this->stack_limit)){
-		return false; //no more 'memory' available
+bool stack_allocator<T>::add_substack(){
+	T* space = (T*)malloc(this->stack_size*sizeof(T));
+	if(unlikely(!space)){return false;}
+
+	this->ptrs.emplace_back(space, deleter());
+	this->cur_ptr = space;	
+	this->cur_stackend = space + this->stack_size;
+	this->cur_substack = this->ptrs.end()-1;
+	return true;
+}
+
+template<class T>
+T* stack_allocator<T>::update_cur_stack(){
+	++(this->cur_substack);
+	if(this->cur_substack == ptrs.end()){
+		if(!this->add_substack()){
+			return nullptr;
+		}
 	}
 	else{
-		if(!hint){
-			hint = this->ptrs.back().get() + this->stack_size;
-		}
-		T* space = this->alloc.allocate(this->stack_size, hint);
-		this->ptrs.emplace_back(space, deleter(this->alloc, this->stack_size));
-		this->cur_ptr = space;	
-		this->cur_stackend = space + this->stack_size;
-		this->cur_substack = this->ptrs.end()-1;
-		return true;
-	}
-}
-
-template<class T>
-T* stack_allocator<T>::get_ptr_nothrow(){
-	if(unlikely(this->cur_ptr == this->cur_stackend)){
-		++(this->cur_substack);
-		if(this->cur_substack == ptrs.end()){
-			if(!this->add_substack()){
-				return nullptr;
-			}
-		}
-		else{
-			this->cur_ptr = this->cur_substack->get();
-			this->cur_stackend = this->cur_ptr + this->stack_size;
-		}
+		this->cur_ptr = this->cur_substack->get();
+		this->cur_stackend = this->cur_ptr + this->stack_size;
 	}
 	return this->cur_ptr++;
 }
 
 template<class T>
 T* stack_allocator<T>::get_ptr(){
-	T* rptr = get_ptr_nothrow();
-	if(unlikely(!rptr)){
-		throw std::bad_alloc();
+	if(unlikely(this->cur_ptr == this->cur_stackend)){
+		return this->update_cur_stack(); //uninlined to play nice with i-cache
 	}
-	return rptr;
+	return this->cur_ptr++;
 }
 
 template<class T>
-template<class... Args>
-T* stack_allocator<T>::create(Args&&... vargs){
-	return new (this->get_ptr()) T(std::forward<Args>(vargs)...);
-}
-
-template<class T>
-template<class... Args>
-T* stack_allocator<T>::create_nothrow(Args&&... vargs){
-	return new (this->get_ptr_nothrow()) T(std::forward<Args>(vargs)...);
-}
-
-
-template<class T>
-template<bool do_release>
-void stack_allocator<T>::releaser(){	
-	if(unlikely(this->cur_ptr == this->cur_substack->get())){
-		if(unlikely(this->cur_substack == this->ptrs.begin())){
-			return;
-		}
-		--(this->cur_substack);
-		this->cur_stackend = this->cur_substack->get() + this->stack_size;
-		this->cur_ptr = this->cur_stackend - 1;
+template<bool do_free>
+void stack_allocator<T>::fancy_release(){
+	if(unlikely(this->cur_substack == this->ptrs.begin())){
+		return;
 	}
-	else{
+	--(this->cur_substack);
+	this->cur_stackend = this->cur_substack->get() + this->stack_size;
+	this->cur_ptr = this->cur_stackend - 1;
+
+	if(do_free){
+		this->cur_ptr->~T();
+	}
+}
+template<class T>
+template<bool do_free>
+void stack_allocator<T>::releaser(){
+
+	if(likely(this->cur_ptr != this->cur_substack->get())){
 		this->cur_ptr--;
 	}
-	if(do_release){
+	else{
+		this->fancy_release<do_free>();
+	}
+	if(do_free){
 		this->cur_ptr->~T();
 	}
 }
 
-template<class T>
-void stack_allocator<T>::free(){
-	this->releaser<true>();
-}
-
-template<class T>
-void stack_allocator<T>::release() noexcept {
-	this->releaser<false>();
-}
-
-/**
- * This class emulates a stack, except in dynamic memory.
- * It only holds a single block of memory, and will
- * fail to allocate more once the limit has been reached
- */
-
+//!core of the fixed_stack_allocator
 template<class T>
 class fixed_stack_allocator{
-
-	using allocator = std::allocator<T>;
+protected:
 	struct deleter{
-		allocator& alloc;
-		size_t num;
-		deleter(allocator& _alloc, size_t val)
-			:
-			alloc(_alloc),
-			num(val){
-		}
 		void operator()(T* del) const{
-			alloc.deallocate(del, num);
+			::free(del);
 		}
 	};
 
@@ -235,7 +229,6 @@ class fixed_stack_allocator{
 	void releaser();
 
 	using ptr_type = std::unique_ptr<T[], deleter>;
-	allocator alloc;
 	ptr_type data;
 	T* cur_ptr;
 	T* cur_stackend;
@@ -254,94 +247,31 @@ public:
 	 * and there can only be stack_limit elements
 	 * or unlimited if stack_limit==0
 	 * @param stack_size The size of each sub-stack used in allocating
-	 * @param hint A hint for where to do the next allocation
 	 */
-	fixed_stack_allocator(size_t stack_size, T* hint=0);
+	fixed_stack_allocator(size_t stack_size);
 
 	/**
 	 * Retrieves a pointer to an location in memory that holds 1 T,
 	 * except uninitialized. If allocations fails, return nullptr.
 	 */
-	T* get_ptr_nothrow() noexcept;
-
-	/**
-	 * The same as get_ptr_nothrow(), except throws std::bad_alloc
-	 * when a pointer cannot be retrieved
-	 * @raises std::bad_alloc upon failure
-	 */
 	T* get_ptr();
-
-	/**
-	 * Returns a pointer to an object of type T,
-	 * initialized with T(...vargs)
-	 * @param vargs The arguments passed to the constructor
-	 * @return A pointer to a newly constructed T(...vargs)
-	 */
-	template<class... Args>
-	T* create(Args&&... vargs);
-
-	/**
-	 * Same as create(args...), except will return a null pointer
-	 * instead of throwing if the allocator cannot allocate memory
-	 */
-	template<class... Args>
-	T* create_nothrow(Args&&... vargs);
-
-	/**
-	 * Releases the pointer on the top of the stack,
-	 * but does not call the destructor of the object.
-	 */
-	void release() noexcept;
-
-	/**
-	 * Destroys the object on the top of the stack and releases the
-	 * memory, similar to delete
-	 */
-	void free();
 
 };
 
 template<class T>
-fixed_stack_allocator<T>::fixed_stack_allocator(size_t stack_size, T* hint)
+fixed_stack_allocator<T>::fixed_stack_allocator(size_t stack_size)
 	:
-	alloc(),
-	data(alloc.allocate(stack_size, hint),
-	     deleter(alloc, stack_size)),
+	data((T*)malloc(stack_size*sizeof(T)), deleter()),
 	cur_ptr(data.get()),
 	cur_stackend(cur_ptr + stack_size){
 }
 
 template<class T>
-T* fixed_stack_allocator<T>::get_ptr_nothrow() noexcept{
+T* fixed_stack_allocator<T>::get_ptr() {
 	if(likely(this->cur_ptr != this->cur_stackend)){
 		return this->cur_ptr++;
 	}
 	return nullptr;
-}
-
-template<class T>
-T* fixed_stack_allocator<T>::get_ptr(){
-	T* rptr = get_ptr_nothrow();
-	if(unlikely(!rptr)){
-		throw std::bad_alloc();
-	}
-	return rptr;
-}
-
-template<class T>
-template<class... Args>
-T* fixed_stack_allocator<T>::create(Args&&... vargs){
-	return new (this->get_ptr()) T(std::forward<Args>(vargs)...);
-}
-
-template<class T>
-template<class... Args>
-T* fixed_stack_allocator<T>::create_nothrow(Args&&... vargs){
-	T* rptr = this->get_ptr_nothrow();
-	if(unlikely(not rptr)){
-		throw std::bad_alloc();
-	}
-	return new (this->get_ptr_nothrow()) T(std::forward<Args>(vargs)...);
 }
 
 template<class T>
@@ -355,15 +285,27 @@ void fixed_stack_allocator<T>::releaser(){
 	}
 }
 
+} //namespace alloc
+    
+/**
+ * This class emulates a stack, except in dynamic memory.
+ * It will grow to accomodate the amount of memory needed,
+ * and provides almost free allocations/deallocations.
+ * However, memory can only be acquired/released from the top
+ * of the stack
+ */
 template<class T>
-void fixed_stack_allocator<T>::free(){
-	this->releaser<true>();
-}
+using stack_allocator = alloc::stack_allocator_common<T, alloc::stack_allocator>;
 
+
+/**
+ * This class emulates a stack, except in dynamic memory.
+ * It only holds a single block of memory, and will
+ * fail to allocate more once the limit has been reached
+ */
 template<class T>
-void fixed_stack_allocator<T>::release() noexcept{
-	this->releaser<false>();
-}
+using fixed_stack_allocator =
+	alloc::stack_allocator_common<T, alloc::fixed_stack_allocator>;
 
 } //namespace util
 } //namespace openage
