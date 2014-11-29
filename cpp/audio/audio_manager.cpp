@@ -8,6 +8,7 @@
 
 #include "resource.h"
 
+#include "../util/unique.h"
 #include "../log.h"
 #include "../util/dir.h"
 #include "../util/error.h"
@@ -58,11 +59,11 @@ AudioManager::AudioManager(const std::string &device_name, int freq,
 	}
 
 	// initialize playing sounds vectors
-	using sound_vector = std::vector<std::shared_ptr<SoundImpl>>;
-	playing_sounds.insert({category_t::GAME, sound_vector{}});
-	playing_sounds.insert({category_t::INTERFACE, sound_vector{}});
-	playing_sounds.insert({category_t::MUSIC, sound_vector{}});
-	playing_sounds.insert({category_t::TAUNT, sound_vector{}});
+	using sound_vector = std::vector<SoundImpl*>;
+	playing_sounds.emplace(category_t::GAME, sound_vector{});
+	playing_sounds.emplace(category_t::INTERFACE, sound_vector{});
+	playing_sounds.emplace(category_t::MUSIC, sound_vector{});
+	playing_sounds.emplace(category_t::TAUNT, sound_vector{});
 
 	mix_buffer.reset(new int32_t[4 * device_spec.samples *
 			device_spec.channels]);
@@ -93,28 +94,27 @@ void AudioManager::load_resources(const util::Dir &asset_dir,
 		auto resource = Resource::create_resource(category, id, path, format, loader_policy);
 
 		// TODO check resource already existing
-		resources.insert({key, resource});
+		resources.emplace(key, std::move(resource));
 	}
 }
 
 Sound AudioManager::get_sound(category_t category, int id) {
 	auto resource = resources.find(std::make_tuple(category, id));
 	if (resource == std::end(resources)) {
-		throw util::Error{"sound resource does not exist: category=%d, id=%d", static_cast<int>(category), id};
+		throw util::Error{"sound resource does not exist: category=%d, id=%d",
+				static_cast<int>(category), id};
 	}
-
-	auto sound_impl = std::make_shared<SoundImpl>(resource->second);
-	return Sound{this, sound_impl};
+	return Sound(this, util::make_unique<SoundImpl>(resource->second.get()));
 }
 
-void remove_from_vector(std::vector<std::shared_ptr<SoundImpl>> &v, size_t i) {
+void remove_from_vector(std::vector<SoundImpl*> &v, size_t i) {
 	// current sound is the last in the list, so just remove it
 	if (i == v.size()-1) {
 		v.pop_back();
 	// current sound is in the middle of the list, so it will be
 	// exchanged with the last sound and the removed
 	} else {
-		v[i] = v.back();
+		std::swap(v[i], v.back());
 		v.pop_back();
 	}
 }
@@ -150,18 +150,18 @@ void AudioManager::audio_callback(int16_t *stream, int len) {
 	}
 }
 
-void AudioManager::add_sound(std::shared_ptr<SoundImpl> sound) {
+void AudioManager::add_sound(SoundImpl* sound) {
 	SDL_LockAudioDevice(device_id);
 
 	auto category = sound->get_category();
 	auto &playing_list = playing_sounds.find(category)->second;
 	// TODO probably check if sound already exists in playing list
-	playing_list.push_back(sound);
+	playing_list.emplace_back(sound);
 
 	SDL_UnlockAudioDevice(device_id);
 }
 
-void AudioManager::remove_sound(std::shared_ptr<SoundImpl> sound) {
+void AudioManager::remove_sound(SoundImpl* sound) {
 	SDL_LockAudioDevice(device_id);
 
 	auto category = sound->get_category();
@@ -185,7 +185,7 @@ std::vector<std::string> AudioManager::get_devices() {
 	std::vector<std::string> device_list;
 	auto num_devices = SDL_GetNumAudioDevices(0);
 	for (int i = 0; i < num_devices; i++) {
-		device_list.push_back(SDL_GetAudioDeviceName(i, 0));
+		device_list.emplace_back(SDL_GetAudioDeviceName(i, 0));
 	}
 	return device_list;
 }
@@ -194,7 +194,7 @@ std::vector<std::string> AudioManager::get_drivers() {
 	std::vector<std::string> driver_list;
 	auto num_drivers = SDL_GetNumAudioDrivers();
 	for (int i = 0; i < num_drivers; i++) {
-		driver_list.push_back(SDL_GetAudioDriver(i));
+		driver_list.emplace_back(SDL_GetAudioDriver(i));
 	}
 	return driver_list;
 }

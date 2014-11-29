@@ -393,7 +393,7 @@ bool GameMain::on_input(SDL_Event *e) {
 				obj->unit->delete_unit();
 			} else if ( this->available_objects.size() > 0 ) {
 				// try creating a unit
-				std::shared_ptr<UnitProducer> producer = this->available_objects[this->editor_current_building];
+				UnitProducer& producer = *this->available_objects[this->editor_current_building];
 				this->placed_units.new_unit(producer, terrain, mousepos_tile);
 			}
 			break;
@@ -599,9 +599,11 @@ bool GameMain::on_drawhud() {
 		coord::window bpreview_pos;
 		bpreview_pos.x = e.window_size.x - 200;
 		bpreview_pos.y = 200;
-		this->available_objects[this->editor_current_building]->default_texture()->draw(bpreview_pos.to_camhud());
+		auto ptrval = this->available_objects[this->editor_current_building].get();
+		auto txt = ptrval->default_texture();
+		auto camhud = bpreview_pos.to_camhud();
+		txt->draw(camhud);
 	}
-
 	return true;
 }
 
@@ -688,7 +690,7 @@ void TestSound::play() {
 	int rand = util::random_range(0, this->sound_items.size());
 	int sndid = this->sound_items[rand];
 	try {
-		audio::Sound{am.get_sound(audio::category_t::GAME, sndid)}.play();
+		am.get_sound(audio::category_t::GAME, sndid).play();
 	}
 	catch(util::Error &e) {
 		log::dbg("cannot play: %s", e.str());

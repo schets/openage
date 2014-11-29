@@ -81,7 +81,7 @@ public:
 	virtual std::tuple<const int16_t*,uint32_t> get_samples(uint32_t position,
 			uint32_t num_samples) = 0;
 
-	static std::shared_ptr<Resource> create_resource(
+	static std::unique_ptr<Resource> create_resource(
 		category_t category,
 		int id, const std::string &path, format_t format,
 		loader_policy_t loader_policy

@@ -36,11 +36,11 @@ private:
 
 	std::unique_ptr<int32_t[]> mix_buffer;
 
-	std::unordered_map<std::tuple<category_t,int>,std::shared_ptr<Resource>>
-			resources;
-
-	std::unordered_map<category_t,std::vector<std::shared_ptr<SoundImpl>>>
-			playing_sounds;
+	std::unordered_map<std::tuple<category_t,int>, std::unique_ptr<Resource>>
+		resources;
+	
+	std::unordered_map<category_t,std::vector<SoundImpl*>>
+		playing_sounds;
 
 public:
 	AudioManager(int freq, SDL_AudioFormat format, uint8_t channels,
@@ -64,7 +64,8 @@ public:
 	 * Loads all audio resources, that are specified in the sound_files vector.
 	 * @param sound_files a list of all sound resources
 	 */
-	void load_resources(const util::Dir &asset_dir, const std::vector<gamedata::sound_file> &sound_files);
+	void load_resources(const util::Dir &asset_dir,
+	                    const std::vector<gamedata::sound_file> &sound_files);
 
 	/**
 	 * Returns a sound object with the given category and the given id. If no
@@ -82,8 +83,8 @@ public:
 	SDL_AudioSpec get_device_spec() const;
 
 private:
-	void add_sound(std::shared_ptr<SoundImpl> sound);
-	void remove_sound(std::shared_ptr<SoundImpl> sound);
+	void add_sound(SoundImpl* sound);
+	void remove_sound(SoundImpl* sound);
 
 	// Sound is the AudioManager's friend, so that only sounds can access the
 	// add and remove sound method's

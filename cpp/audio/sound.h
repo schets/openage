@@ -24,9 +24,11 @@ class AudioManager;
 class SoundImpl {
 public:
 	/**
-	 * The shared audio resource, which provides the pcm data to play.
+	 * The audio resource, which provides the pcm data to play.
+	 * Owned by the audio manager
 	 */
-	std::shared_ptr<Resource> resource;
+	Resource* resource;
+
 	/**
 	 * Whether this sound currently actively uses it's shared audio resource.
 	 */
@@ -36,6 +38,7 @@ public:
 	 * The sounds volume.
 	 */
 	int32_t volume;
+
 	/**
 	 * The sounds playing offset.
 	 */
@@ -45,18 +48,25 @@ public:
 	 * Whether this sound is currently playing.
 	 */
 	bool playing;
+
 	/**
 	 * Whether this sound is currently looping.
 	 */
 	bool looping;
 
-	SoundImpl(std::shared_ptr<Resource> resource, int32_t volume=128);
+	/**
+	   Uniquely identifies the object
+	*/
+	size_t impl_id;
+
+	SoundImpl(Resource* resource, int32_t volume=128);
 	~SoundImpl();
 
 	/**
 	 * Returns this sound's category.
 	 */
 	category_t get_category() const;
+
 	/**
 	 * Returns this sound's id.
 	 */
@@ -75,7 +85,7 @@ public:
 /**
  * A sound object is the direct interface to the user. It provides methods to
  * control the sound, e.g. play, stop, etc. It is a lightweight object that
- * stores a shared_ptr to its internal SoundImpl and a pointer to its
+ * stores a pointer to its internal SoundImpl and a pointer to its
  * AudioManager.
  */
 class Sound {
@@ -84,17 +94,19 @@ private:
 	 * The audio manager that manages this sound.
 	 */
 	AudioManager *audio_manager;
+
 	/**
 	 * The internal sound implementation. This is where the internal state, e.g.
 	 * current playing offset, volume, etc., is stored.
 	 */
-	std::shared_ptr<SoundImpl> sound_impl;
+	std::unique_ptr<SoundImpl> sound_impl;
 
 public:
 	/**
 	 * Returns this sound's category.
 	 */
 	category_t get_category() const;
+
 	/**
 	 * Returns this sound's id.
 	 */
@@ -107,6 +119,7 @@ public:
 	 * @param volume the new volume
 	 */
 	void set_volume(int32_t volume);
+
 	/**
 	 * Returns this sound's volume.
 	 */
@@ -118,6 +131,7 @@ public:
 	 * @param looping true, if this sound should be looping, otherwise false
 	 */
 	void set_looping(bool looping);	
+
 	/**
 	 * Returns whether this sound is looping.
 	 */
@@ -127,14 +141,17 @@ public:
 	 * Resets the sound to it's beginning and starts playing it.
 	 */
 	void play();
+	
 	/**
 	 * Pauses the sound at it's current playing offset.
 	 */
 	void pause();
+	
 	/**
 	 * Resumes the sound at it's current playing offset.
 	 */
 	void resume();
+	
 	/**
 	 * Resets the sound to it's beginning and stops playing it.
 	 */
@@ -145,8 +162,12 @@ public:
 	 */
 	bool is_playing() const;
 
+	~Sound();
+
+	Sound(Sound&& other) = default;
+
 private:
-	Sound(AudioManager *audio_manager, std::shared_ptr<SoundImpl> sound_impl);
+	Sound(AudioManager *audio_manager, std::unique_ptr<SoundImpl> sound_impl);
 
 	friend class AudioManager;
 };

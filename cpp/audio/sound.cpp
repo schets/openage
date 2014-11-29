@@ -10,10 +10,10 @@
 namespace openage {
 namespace audio {
 
-Sound::Sound(AudioManager *audio_manager, std::shared_ptr<SoundImpl> sound_impl)
+Sound::Sound(AudioManager *audio_manager, std::unique_ptr<SoundImpl> sound_impl)
 		:
 		audio_manager{audio_manager},
-		sound_impl{sound_impl} {
+		sound_impl{std::move(sound_impl)} {
 }
 
 category_t Sound::get_category() const {
@@ -47,14 +47,14 @@ void Sound::play() {
 	}
 	sound_impl->offset = 0;
 	if (!sound_impl->playing) {
-		audio_manager->add_sound(sound_impl);
+		audio_manager->add_sound(sound_impl.get());
 		sound_impl->playing = true;
 	}
 }
 
 void Sound::pause() {
 	if (sound_impl->playing) {
-		audio_manager->remove_sound(sound_impl);
+		audio_manager->remove_sound(sound_impl.get());
 		sound_impl->playing = false;
 	}
 }
@@ -65,7 +65,7 @@ void Sound::resume() {
 		sound_impl->in_use = true;
 	}
 	if (!sound_impl->playing) {
-		audio_manager->add_sound(sound_impl);
+		audio_manager->add_sound(sound_impl.get());
 		sound_impl->playing = true;
 	}
 }
@@ -73,7 +73,7 @@ void Sound::resume() {
 void Sound::stop() {
 	sound_impl->offset = 0;
 	if (sound_impl->playing) {
-		audio_manager->remove_sound(sound_impl);
+		audio_manager->remove_sound(sound_impl.get());
 		sound_impl->playing = false;
 	}
 	if (sound_impl->in_use) {
@@ -86,9 +86,12 @@ bool Sound::is_playing() const {
 	return sound_impl->playing;
 }
 
+Sound::~Sound(){
+	audio_manager->remove_sound(sound_impl.get());
+}
 // here begins the internal sound implementation
 
-SoundImpl::SoundImpl(std::shared_ptr<Resource> resource, int32_t volume)
+SoundImpl::SoundImpl(Resource* resource, int32_t volume)
 		:
 		resource{resource},
 		in_use{false},
@@ -142,5 +145,5 @@ bool SoundImpl::mix_audio(int32_t *stream, int len) {
 	return false;
 }
 
-}
-}
+} //namespace audio
+} //namespace openage
