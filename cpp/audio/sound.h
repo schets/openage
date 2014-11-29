@@ -164,7 +164,7 @@ public:
 
 	~Sound();
 
-	Sound(Sound&& other) = default;
+	Sound(Sound&& other);
 
 private:
 	Sound(AudioManager *audio_manager, std::unique_ptr<SoundImpl> sound_impl);

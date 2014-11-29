@@ -16,6 +16,14 @@ Sound::Sound(AudioManager *audio_manager, std::unique_ptr<SoundImpl> sound_impl)
 		sound_impl{std::move(sound_impl)} {
 }
 
+Sound::Sound(Sound&& other)
+	:
+	audio_manager(other.audio_manager),
+	sound_impl(std::move(other.sound_impl)){
+	other.audio_manager = nullptr;
+	other.sound_impl = nullptr;
+}
+
 category_t Sound::get_category() const {
 	return sound_impl->get_category();
 }
@@ -87,7 +95,9 @@ bool Sound::is_playing() const {
 }
 
 Sound::~Sound(){
-	audio_manager->remove_sound(sound_impl.get());
+	if(audio_manager && sound_impl){
+		audio_manager->remove_sound(sound_impl.get());
+	}
 }
 // here begins the internal sound implementation
 
