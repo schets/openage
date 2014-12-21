@@ -2,13 +2,13 @@
 //
 #ifndef OPENAGE_UTIL_STACK_ALLOCATOR_H_
 #define OPENAGE_UTIL_STACK_ALLOCATOR_H_
-#include <memory>
 #include <cstdlib>
-#include <vector>
 #include <utility>
+#include <vector>
 #include <new>
 
 #include "compiler.h"
+#include "unique.h"
 namespace openage{
 namespace util{
 
@@ -88,8 +88,6 @@ public:
 	inline size_t alloc_size() const {return sizeof(T);}
 };
 
-
-
 //!implementation of stack allocator
 template<class T>
 class stack_allocator{
@@ -113,9 +111,9 @@ protected:
 	T* cur_stackend;
 	typename std::vector<ptr_type>::iterator cur_substack;
 	
-	bool add_substack();
+	void add_substack();
 
-	T* update_cur_stack();
+	void update_cur_stack();
 
 public:
 	stack_allocator(const stack_allocator&) = delete;
@@ -151,36 +149,32 @@ stack_allocator<T>::stack_allocator(size_t _stack_size)
 }
 
 template<class T>
-bool stack_allocator<T>::add_substack(){
+void stack_allocator<T>::add_substack(){
 	T* space = (T*)malloc(this->stack_size*sizeof(T));
-	if(unlikely(!space)){return false;}
-
+	if(unlikely(!space)) {throw std::bad_alloc();}
+	
 	this->ptrs.emplace_back(space, deleter());
 	this->cur_ptr = space;	
 	this->cur_stackend = space + this->stack_size;
 	this->cur_substack = this->ptrs.end()-1;
-	return true;
 }
 
 template<class T>
-T* stack_allocator<T>::update_cur_stack(){
+void stack_allocator<T>::update_cur_stack(){
 	++(this->cur_substack);
 	if(this->cur_substack == ptrs.end()){
-		if(!this->add_substack()){
-			return nullptr;
-		}
+		this->add_substack();
 	}
 	else{
 		this->cur_ptr = this->cur_substack->get();
 		this->cur_stackend = this->cur_ptr + this->stack_size;
 	}
-	return this->cur_ptr++;
 }
 
 template<class T>
 T* stack_allocator<T>::get_ptr(){
 	if(unlikely(this->cur_ptr == this->cur_stackend)){
-		return this->update_cur_stack(); //uninlined to play nice with i-cache
+		this->update_cur_stack();
 	}
 	return this->cur_ptr++;
 }
@@ -202,7 +196,6 @@ void stack_allocator<T>::fancy_release(){
 template<class T>
 template<bool do_free>
 void stack_allocator<T>::releaser(){
-
 	if(likely(this->cur_ptr != this->cur_substack->get())){
 		this->cur_ptr--;
 	}
@@ -264,6 +257,9 @@ fixed_stack_allocator<T>::fixed_stack_allocator(size_t stack_size)
 	data((T*)malloc(stack_size*sizeof(T)), deleter()),
 	cur_ptr(data.get()),
 	cur_stackend(cur_ptr + stack_size){
+	if(!this->data){
+		throw std::bad_alloc();
+	}
 }
 
 template<class T>

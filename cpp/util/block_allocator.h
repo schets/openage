@@ -10,9 +10,11 @@
 #include <new>
 
 #include "compiler.h"
+#include "unique.h"
 namespace openage{
 namespace util{
-namespace alloc{ //push implementation into 'hidden' namespace
+//push implementation into 'hidden' namespace
+namespace _alloc{ 
 
 /**
  * Class for common block allocator functionality
@@ -52,7 +54,7 @@ public:
 	using shared_type = std::shared_ptr<T>;
 
 	/**
-	 * The same as get_ptr_nothrow(), except throws std::bad_alloc
+	 * The same as get_ptr(), except throws std::bad_alloc
 	 * when a pointer cannot be retrieved
 	 * @raises std::bad_alloc upon failure
 	 */
@@ -162,17 +164,17 @@ protected:
 	template<bool do_free>
 	inline void releaser(T* to_release);
 
-	void update_blocks(_block* block) ;
+	void update_blocks(_block* block);
 
-	void add_data() ;
+	void add_data();
 
-	void swap_good() ;
+	void swap_good();
 
-	//!size of each block
+	;	//!size of each block
 	size_t block_size;
 
 	//!block lookup vector
-	std::vector<std::unique_ptr<_block> > lookup_vec;
+	;	std::vector<std::unique_ptr<_block> > lookup_vec;
 
 	//!location of the last good data block
 	size_t last_good;
@@ -214,15 +216,8 @@ block_allocator<T>::block_allocator(size_t _block_size)
 
 template<class T>
 void block_allocator<T>::add_data(){
-	_block* new_b = new (std::nothrow) _block(this->block_size,
-	                           this->lookup_vec.size());
-	if(likely(new_b)){
-		if(unlikely(!new_b->data.get())){
-			delete new_b;
-		} 
-		this->lookup_vec.emplace_back(new_b);
-		this->last_good++;
-	}
+	this->lookup_vec.emplace_back(make_unique<_block>(this->block_size, this->lookup_vec.size()));
+	this->last_good++;
 }
 
 template<class T>
@@ -240,8 +235,6 @@ template<class T>
 T* block_allocator<T>::get_ptr() {
 	_block* block = lookup_vec.back().get();
 	val_ptr* fst = block->first_open;
-	if(unlikely(!fst)){return nullptr;}
-
 	block->first_open = block->first_open->next;
 	fst->data.holder = block;
 	if(unlikely(!block->first_open)){
@@ -267,16 +260,19 @@ void block_allocator<T>::update_blocks(_block* block) {
 template<class T>
 template<bool do_free>
 inline void block_allocator<T>::releaser(T* to_release){
-	val_ptr* vptr = (val_ptr*)to_release;
-	_block* block = vptr->data.holder;
-	if(do_free){
-		to_release->~T();
+	if(likely(to_release)){
+		val_ptr* vptr = (val_ptr*)to_release;
+		_block* block = vptr->data.holder;
+	
+		if(do_free){
+			to_release->~T();
+		}
+		if(unlikely(!block->first_open)){
+			this->update_blocks(block);
+		}
+		vptr->next = block->first_open;
+		block->first_open = vptr;
 	}
-	if(unlikely(!block->first_open)){
-		this->update_blocks(block);
-	}
-	vptr->next = block->first_open;
-	block->first_open = vptr;
 }
 
 template<class T>
@@ -285,16 +281,12 @@ block_allocator<T>::_block::_block(size_t data_len, size_t ind)
 	data((val_ptr*)malloc(data_len*sizeof(val_ptr)), internal_deleter()),
 	ptr_ind(ind){
 
-	if(likely(data)){
-		for(size_t i = 0; i < data_len-1; i++){
-			this->data[i].next = &this->data[i+1];
-		}
-		this->data[data_len-1].next=nullptr;
-		this->first_open = &this->data[0];
+	if(unlikely(!data)){throw std::bad_alloc();}
+	for(size_t i = 0; i < data_len-1; i++){
+		this->data[i].next = &this->data[i+1];
 	}
-	else{
-		this->first_open = nullptr;
-	}
+	this->data[data_len-1].next=nullptr;
+	this->first_open = &this->data[0];
 }
 
 
@@ -364,6 +356,7 @@ fixed_block_allocator<T>::fixed_block_allocator(size_t _block_size)
 	data((val_ptr*)malloc(block_size*sizeof(val_ptr)), internal_deleter()),
 	first_open(data.get()){
 
+	if(unlikely(!data)){throw std::bad_alloc();}
 	for(size_t i = 0; i < this->block_size-1; i++){
 		this->data[i].next = &this->data[i+1];
 	}
@@ -384,12 +377,14 @@ T* fixed_block_allocator<T>::get_ptr()  {
 template<class T>
 template<bool do_free>
 void fixed_block_allocator<T>::releaser(T* to_release){
-	val_ptr* vptr = (val_ptr*)to_release;
-	if(do_free){
-		to_release->~T();
+	if(likely(to_release)){
+		val_ptr* vptr = (val_ptr*)to_release;
+		if(do_free){
+			to_release->~T();
+		}
+		vptr->next = this->first_open;
+		this->first_open = vptr;
 	}
-	vptr->next = this->first_open;
-	this->first_open = vptr;
 }
 
 
@@ -419,7 +414,6 @@ public:
 	}
 };
 
-
 } //namespace alloc
 
 /**
@@ -439,7 +433,7 @@ public:
  */
 template<class T>
 using block_allocator =
-	alloc::block_allocator_common<T, alloc::block_allocator>;
+	_alloc::block_allocator_common<T, alloc::block_allocator>;
 
 /**
  * This is a allocator for single allocations that returns memory out
@@ -458,13 +452,12 @@ using block_allocator =
  */
 template<class T>
 using fixed_block_allocator =
-	alloc::block_allocator_common<T, alloc::fixed_block_allocator>;
+	_alloc::block_allocator_common<T, alloc::fixed_block_allocator>;
 
 //!'Block allocator' which just calls malloc under the hood
 template<class T>
 using standard_allocator =
-	alloc::block_allocator_common<T, alloc::standard_allocator>;
-
+	_alloc::block_allocator_common<T, alloc::standard_allocator>;
 
 } //namespace util
 } //namespace openage
