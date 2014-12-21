@@ -170,11 +170,11 @@ protected:
 
 	void swap_good();
 
-	;	//!size of each block
+	//!size of each block
 	size_t block_size;
 
 	//!block lookup vector
-	;	std::vector<std::unique_ptr<_block> > lookup_vec;
+	std::vector<std::unique_ptr<_block> > lookup_vec;
 
 	//!location of the last good data block
 	size_t last_good;
@@ -433,7 +433,7 @@ public:
  */
 template<class T>
 using block_allocator =
-	_alloc::block_allocator_common<T, alloc::block_allocator>;
+	_alloc::block_allocator_common<T, _alloc::block_allocator>;
 
 /**
  * This is a allocator for single allocations that returns memory out
@@ -452,12 +452,12 @@ using block_allocator =
  */
 template<class T>
 using fixed_block_allocator =
-	_alloc::block_allocator_common<T, alloc::fixed_block_allocator>;
+	_alloc::block_allocator_common<T, _alloc::fixed_block_allocator>;
 
 //!'Block allocator' which just calls malloc under the hood
 template<class T>
 using standard_allocator =
-	_alloc::block_allocator_common<T, alloc::standard_allocator>;
+	_alloc::block_allocator_common<T, _alloc::standard_allocator>;
 
 } //namespace util
 } //namespace openage
