@@ -35,6 +35,7 @@ _the openage authors_ are:
 | Michael Sebastiyan          | BugExplorer                 | sebastiyan.michael@outlook.com   |
 | Adam Miartus                | miartad                     | adam.miartus@gmail.com           |
 | Benoît Legat                | blegat                      | benoit.legat@gmail.com           |
+| Sam Schetterer              | sams                        | samschet@gmail.com               |
 | James Hagborg               | blucoat                     | jameshagborg@gmail.com           |
 | Prashanth Jonnala           | jprashanth                  | prashanth.neo@gmail.com          |
 | Jonathan Remnant            | Jon0                        | jono4728@gmail.com               |
