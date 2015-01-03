@@ -8,10 +8,10 @@
 namespace openage {
 namespace rng {
 namespace tests {
-constexpr size_t num_rand = 50000000;
+constexpr size_t num_rand = 5000000;
 
 static int rng_freq_t(void) {
-	constexpr size_t dsize = std::numeric_limits<unsigned char>::max()+1;
+	constexpr size_t dsize = std::numeric_limits<unsigned char>::max() + 1;
 	constexpr size_t mean = num_rand / dsize;
 	constexpr size_t max_diff = mean * 0.1;
 	size_t data_points[dsize];
@@ -45,16 +45,42 @@ static int rng_bool_t (void) {
 }
 
 struct my_data {
-	size_t val1, val2, val3, val4;
+	size_t datas[4];
 };
 
-static void compiles_custom_type () {
-	rng<my_data> test(time_seed());
+static int rng_reproduce_t () {
+	rng<my_data> test(10);
+	rng<my_data> test2(10);
+	auto comp_rands = [](const my_data &dat1, const my_data &dat2) {
+		return !memcmp(&dat1, &dat2, sizeof(my_data));
+	};
+	for(size_t i = 0; i < num_rand; i++) {
+		if(! comp_rands(test(), test2())) {
+			return 0;
+		}
+	}
+	return -1;
 }
+
+static int rng_serialize_t() {
+	rng<my_data> test(time_seed());
+	rng<my_data> test2(10);
+	test2.from_string(test.to_string());
+	auto comp_rands = [](const my_data &dat1, const my_data &dat2) {
+		return !memcmp(&dat1, &dat2, sizeof(my_data));
+	};
+	for(size_t i = 0; i < num_rand; i++) {
+		if(! comp_rands(test(), test2())) {
+			return 0;
+		}
+	}
+	return -1;
+}
+
 
 struct data_test {
 	int (*test_fnc)();
-	const char* name;
+	const char *name;
 };
 	
 void perform_tests(std::vector<data_test> tests) {
@@ -70,10 +96,10 @@ void perform_tests(std::vector<data_test> tests) {
 void rng_tests() {
 	perform_tests({
 			{&rng_bool_t, "Tests the distribution of the specialized bool generator"},
-			{&rng_freq_t, "Tests the distribution of the generic generator"}
+			{&rng_freq_t, "Tests the distribution of the generic generator"},
+			{&rng_reproduce_t, "Tests whether the rngs are reproducible"},
+			{&rng_serialize_t, "Tests whether the rngs are serializable"},
 		});
-	
-	compiles_custom_type();
 }
 
 } //namespace tests

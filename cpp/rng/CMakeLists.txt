@@ -1,5 +1,6 @@
 add_sources(${PROJECT_NAME}
 	SFMT.c
+	rng.cpp
 	rng_tests.cpp
 )
 
