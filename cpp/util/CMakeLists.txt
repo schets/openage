@@ -6,7 +6,6 @@ add_sources(${PROJECT_NAME}
 	file.cpp
 	fds.cpp
 	fps.cpp
-	misc.cpp
 	opengl.cpp
 	strings.cpp
 	timer.cpp

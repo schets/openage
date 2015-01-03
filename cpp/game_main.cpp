@@ -4,10 +4,12 @@
 
 #include <SDL2/SDL.h>
 #include "crossplatform/opengl.h"
+#include <random>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <cinttypes>
+#include <ctime>
 
 #include "args.h"
 #include "audio/sound.h"
@@ -684,8 +686,10 @@ void TestSound::play() {
 		return;
 	}
 	audio::AudioManager &am = Engine::get().get_audio_manager();
-
-	int rand = util::random_range(0, this->sound_items.size());
+	rng::rng<size_t> myrng(time(nullptr));
+	std::uniform_int_distribution<> dis(1, this->sound_items.size());
+	
+	int rand = dis(myrng);
 	int sndid = this->sound_items[rand];
 	try {
 		audio::Sound{am.get_sound(audio::category_t::GAME, sndid)}.play();

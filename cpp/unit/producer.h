@@ -6,11 +6,13 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <random>
 
 
 #include "../coord/tile.h"
 #include "../gamedata/gamedata.gen.h"
 #include "../gamedata/graphic.gen.h"
+#include "../rng/rng.h"
 
 namespace openage {
 
@@ -24,12 +26,17 @@ class UnitAbility;
 class UnitAction;
 
 /**
- * Initializes a unit with the required attributes, each unit type should implement these funcrtions
+ * Initializes a unit with the required attributes, each unit type should implement these functions
  * initialise should be called on construction of units 'new Unit(some_unit_producer)'
  * place is called to customise how the unit gets added to the world -- used to setup the TerrainObject position
  */
 class UnitProducer {
+protected:
+	rng::rng<int> rng;
+
 public:
+	UnitProducer(uint32_t seed);
+	
 	virtual ~UnitProducer() {}
 
 	/**

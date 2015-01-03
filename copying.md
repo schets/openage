@@ -121,6 +121,15 @@ cmake modules ([3-clause BSD license](legal/BSD-3-clause))
  - `buildsystem/modules/FindFTGL.cmake` (taken from [ulrichard's FTGL fork](https://github.com/ulrichard/ftgl))
  - `buildsystem/modules/FindGPerfTools.cmake` (taken from [VAST](https://github.com/mavam/vast))
 
+From [SFMT](http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/SFMT/) ([3-clause BSD license](legal/BSD-3-clause))
+
+ - `cpp/rng/SFMT.h`
+ - `cpp/rng/SFMT.c`
+ - `cpp/rng/SFMT_common.h`
+ - `cpp/rng/SFMT_sse2.h`
+ - `cpp/rng/SFMT_sse2_msc.h`
+ - `cpp/rng/SFMT_alti.h`
+
 Notes about this file:
 
 I (mic_e) am not a lawyer. This is an open-source project, we're doing this for

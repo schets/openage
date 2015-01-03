@@ -14,6 +14,11 @@
 
 namespace openage {
 
+UnitProducer::UnitProducer(uint32_t seed)
+	:
+	rng(seed) {
+}
+
 UnitTypeTest::UnitTypeTest(const gamedata::unit_living *ud,
                            Texture *dd,
                            Texture *idl,
@@ -24,6 +29,7 @@ UnitTypeTest::UnitTypeTest(const gamedata::unit_living *ud,
                            TestSound *ms,
                            TestSound *atts)
 	:
+	UnitProducer(10),
 	unit_data(*ud),
 	dead(dd),
 	idle(idl),
@@ -49,7 +55,7 @@ void UnitTypeTest::initialise(Unit *unit) {
 	/*
 	 * basic attributes
 	 */
-	unit->add_attribute(new Attribute<attr_type::color>(util::random_range(1, 8 + 1)));
+	unit->add_attribute(new Attribute<attr_type::color>(rng.random_range(1, 8 + 1)));
 	unit->add_attribute(new Attribute<attr_type::hitpoints>(50, 50));
 	unit->add_attribute(new Attribute<attr_type::direction>(coord::phys3_delta{ 1, 0, 0 }));
 
@@ -126,6 +132,7 @@ BuldingProducer::BuldingProducer(Texture *tex,
                                  TestSound *create,
                                  TestSound *destroy)
 	:
+	UnitProducer(10),
 	on_create(create),
 	on_destroy(destroy),
 	texture(tex),
@@ -139,7 +146,7 @@ BuldingProducer::~BuldingProducer() {
 }
 
 void BuldingProducer::initialise(Unit *unit) {
-	unit->add_attribute(new Attribute<attr_type::color>(util::random_range(1, 8 + 1)));
+	unit->add_attribute(new Attribute<attr_type::color>(rng.random_range(1, 8 + 1)));
 	unit->add_attribute(new Attribute<attr_type::dropsite>());
 
 	unit->push_action( util::make_unique<DeadAction>(unit, this->texture,
